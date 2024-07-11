@@ -4,7 +4,7 @@ from sqlalchemy import text
 def get_qp_data():
     query_qps_em_andamento = text("SELECT cod_qp FROM enaplic_management.dbo.tb_status_qps WHERE status_proj = 'A';")
     cod_qps = db.session.execute(query_qps_em_andamento).fetchall()
-    cod_qps = [row['cod_qp'] for row in cod_qps]
+    cod_qps = [row[0] for row in cod_qps]
 
     data = {}
     for cod_qp in cod_qps:
@@ -21,4 +21,4 @@ def get_qp_data():
 def get_single_value(select_clause, table_name,where_clause):
     query = text(f"SELECT {select_clause} AS value FROM {table_name} WHERE {where_clause};")
     result = db.session.execute(query).fetchone()
-    return result['value'] if result else 0
+    return result[0] if result else 0
