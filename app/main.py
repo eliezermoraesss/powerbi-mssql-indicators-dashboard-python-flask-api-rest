@@ -1,12 +1,16 @@
 from flask import request, jsonify
 from app import create_app
-from app.queries import get_qp_data
+from app.queries import get_all_indicators
 
 app = create_app()
 
-@app.route('/update-indicators', methods=['GET'])
-def run_scheduled_task():
-    data = get_qp_data()
+@app.route('/')
+def home():
+    return "API de Indicadores de Dashboard está online!"
+
+@app.route('/indicators', methods=['GET'])
+def all_indicators():
+    data = get_all_indicators()
     return jsonify(data)
 
 if __name__ == '__main__':
