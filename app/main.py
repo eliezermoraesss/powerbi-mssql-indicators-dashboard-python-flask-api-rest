@@ -1,6 +1,6 @@
 from flask import request, jsonify
 from app import create_app
-from app.queries import get_all_indicators, get_all_totvs_indicators
+from app.controllers.indicator_controller import get_all_indicators, get_all_totvs_indicators, insert_totvs_indicator
 from apscheduler.schedulers.background import BackgroundScheduler
 import requests
 
@@ -20,10 +20,15 @@ def all_totvs_indicators():
     data = get_all_totvs_indicators()
     return jsonify(data)
 
+@app.route('/refresh-totvs-indicators', methods=['POST'])
+def insert_totvs_indicators():
+    insert_totvs_indicator()
+    return f"Atualização de indicadores realizada com sucesso!", 200
+
 def run_task():
     try:
-        response = requests.get('http://127.0.0.1:5000/indicators')
-        print(response.json())
+        requests.post('http://localhost:5000/refresh-totvs-indicators')
+        print("Atualização de indicadores realizada com sucesso!")
     except requests.exceptions.ConnectionError as e:
         print(f"Erro de conexão: {e}")
 

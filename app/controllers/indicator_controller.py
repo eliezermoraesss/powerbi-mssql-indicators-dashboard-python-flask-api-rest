@@ -51,3 +51,23 @@ def get_indicator_value(select_clause, table_name,where_clause):
     query = text(f"SELECT {select_clause} AS value FROM {table_name} WHERE {where_clause};")
     result = db.session.execute(query).fetchone()
     return result[0] if result else 0
+
+def insert_totvs_indicator():
+    data = get_all_indicators()
+    for cod_qp, values in data.items():
+        insert_query = text("""
+        INSERT INTO 
+            enaplic_management.dbo.tb_dashboard_indicators 
+            (cod_qp, vl_open_op, vl_closed_op, vl_all_sc, vl_all_pc, vl_mat_received) 
+        VALUES 
+            (:cod_qp, :vl_open_op, :vl_closed_op, :vl_all_sc, :vl_all_pc, :vl_mat_received)
+        """)
+        db.session.execute(insert_query, {
+            'cod_qp': cod_qp,
+            'vl_open_op': values['op_aberta'],
+            'vl_closed_op': values['op_fechada'],
+            'vl_all_sc': values['sc_aberta'],
+            'vl_all_pc': values['pc_total'],
+            'vl_mat_received': values['mat_entregue']
+        })
+        db.session.commit()
