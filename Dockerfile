@@ -1,11 +1,19 @@
+# Usar a imagem base oficial do Python
 FROM python:latest
 
-WORKDIR /app
+# Definir o diretório de trabalho no contêiner
+WORKDIR /usr/src/app
 
-COPY requirements.txt requirements.txt
-RUN pip install -r requirements.txt
+# Copiar os arquivos de requisitos e instalar as dependências
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
 
-COPY app/ app/
-COPY schedule_task.py schedule_task.py
+# Copiar o restante dos arquivos da aplicação
+COPY . .
 
-CMD ["python", "app/main.py"]
+# Expor a porta que o Flask usará
+EXPOSE 5000
+
+# Comando para rodar a aplicação
+CMD ["python", "app.py"]
+

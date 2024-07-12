@@ -34,7 +34,7 @@ def scheduled_task_insert_totvs_indicators():
 
 if __name__ == '__main__':
     scheduler = BackgroundScheduler()
-    scheduler.add_job(scheduled_task_insert_totvs_indicators, 'interval', days=1)
+    scheduler.add_job(scheduled_task_insert_totvs_indicators, 'interval', seconds=5)
     scheduler.start()
 
     app.run(host='0.0.0.0', port=5000, use_reloader=False)
