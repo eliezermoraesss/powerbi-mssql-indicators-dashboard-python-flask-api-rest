@@ -1,6 +1,6 @@
 from flask import request, jsonify
 from app import create_app
-from app.queries import get_all_indicators
+from app.queries import get_all_indicators, get_all_totvs_indicators
 
 app = create_app()
 
@@ -11,6 +11,10 @@ def home():
 @app.route('/indicators', methods=['GET'])
 def all_indicators():
     data = get_all_indicators()
+    return jsonify(data)
+@app.route('/totvs-indicators', methods=['GET'])
+def all_totvs_indicators():
+    data = get_all_totvs_indicators()
     return jsonify(data)
 
 if __name__ == '__main__':
