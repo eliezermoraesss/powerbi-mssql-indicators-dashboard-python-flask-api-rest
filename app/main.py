@@ -37,6 +37,6 @@ if __name__ == '__main__':
     scheduler.add_job(scheduled_task_insert_totvs_indicators, 'interval', days=1)
     scheduler.start()
 
-    app.run(host='0.0.0.0', port=5000, use_reloader=False)
+    app.run(host='0.0.0.0', port=5000, use_reloader=False, debug=True)
 
 
