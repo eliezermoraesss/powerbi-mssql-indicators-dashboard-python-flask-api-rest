@@ -2,7 +2,7 @@
 FROM python:latest
 
 # Definir o diretório de trabalho no contêiner
-WORKDIR /usr/src/app
+WORKDIR /app
 
 # Copiar os arquivos de requisitos e instalar as dependências
 COPY requirements.txt ./

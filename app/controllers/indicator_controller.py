@@ -28,6 +28,8 @@ def get_all_indicators():
             "indice_recebimento": get_indicator_value("TOP 1 vl_mat_received_perc", "enaplic_management.dbo.tb_dashboard_indicators", f"cod_qp LIKE '%{cod_qp}' ORDER BY id DESC")
         }
 
+    data = percentage_indicators_calculate(data)
+
     return data
 
 def get_all_totvs_indicators():
@@ -47,10 +49,28 @@ def get_all_totvs_indicators():
 
     return data
 
-def save_totvs_indicator():
-    data = get_all_indicators()
+def get_indicator_value(select_clause, table_name,where_clause):
+    query = text(f"SELECT {select_clause} AS value FROM {table_name} WHERE {where_clause};")
+    result = db.session.execute(query).fetchone()
+    return result[0] if result else 0
+
+def percentage_indicators_calculate(data):
 
     for cod_qp, values in data.items():
+        indice_producao = (values['op_fechada'] / values['op_aberta_fechada']) * 100
+        indice_compra = (values['pc_total'] / values['sc_aberta_fechada']) * 100
+        indice_recebimento = (values['mat_entregue'] / values['pc_total']) * 100
+
+        data[cod_qp]['indice_producao'] = indice_producao
+        data[cod_qp]['indice_compra'] = indice_compra
+        data[cod_qp]['indice_recebimento'] = indice_recebimento
+
+    return data
+
+def save_totvs_indicator():
+    dict_data = get_all_indicators()
+
+    for cod_qp, values in dict_data.items():
         insert_query = text("""
         INSERT INTO 
             enaplic_management.dbo.tb_dashboard_indicators 
@@ -68,7 +88,3 @@ def save_totvs_indicator():
         })
         db.session.commit()
 
-def get_indicator_value(select_clause, table_name,where_clause):
-    query = text(f"SELECT {select_clause} AS value FROM {table_name} WHERE {where_clause};")
-    result = db.session.execute(query).fetchone()
-    return result[0] if result else 0
