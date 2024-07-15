@@ -30,14 +30,14 @@ def get_all_indicators():
                                                     f"cod_qp LIKE '%{cod_qp}' ORDER BY id DESC")
 
         # Adiciona os valores que dependem de contagens específicas
-        data[cod_qp]["op_aberta_fechada"] = get_indicator_value("COUNT(*)", "SC2010",
-                                                                f"C2_ZZNUMQP LIKE '%{cod_qp}' AND C2_DATRF = '       ' AND D_E_L_E_T_ <> '*'")
+        data[cod_qp]["op_total"] = get_indicator_value("COUNT(*)", "SC2010",
+                                                                f"C2_ZZNUMQP LIKE '%{cod_qp}' AND D_E_L_E_T_ <> '*'")
 
         data[cod_qp]["op_fechada"] = get_indicator_value("COUNT(*)", "SC2010",
                                                          f"C2_ZZNUMQP LIKE '%{cod_qp}' AND C2_DATRF <> '       ' AND D_E_L_E_T_ <> '*'")
 
-        data[cod_qp]["sc_aberta_fechada"] = get_indicator_value("COUNT(*)", "SC1010",
-                                                                f"C1_ZZNUMQP LIKE '%{cod_qp}' AND C1_PEDIDO = '      ' AND D_E_L_E_T_ <> '*'")
+        data[cod_qp]["sc_total"] = get_indicator_value("COUNT(*)", "SC1010",
+                                                                f"C1_ZZNUMQP LIKE '%{cod_qp}' AND D_E_L_E_T_ <> '*'")
 
         data[cod_qp]["pc_total"] = get_indicator_value("COUNT(*)", "SC7010",
                                                        f"C7_ZZNUMQP LIKE '%{cod_qp}' AND D_E_L_E_T_ <> '*'")
@@ -57,9 +57,9 @@ def get_all_totvs_indicators():
     data = {}
     for cod_qp in cod_qps:
         data[cod_qp] = {
-            "op_aberta_fechada": get_indicator_value("COUNT(*)", "SC2010", f"C2_ZZNUMQP LIKE '%{cod_qp}' AND D_E_L_E_T_ <> '*'"),
+            "op_total": get_indicator_value("COUNT(*)", "SC2010", f"C2_ZZNUMQP LIKE '%{cod_qp}' AND D_E_L_E_T_ <> '*'"),
             "op_fechada": get_indicator_value("COUNT(*)", "SC2010", f"C2_ZZNUMQP LIKE '%{cod_qp}' AND C2_DATRF <> '       ' AND D_E_L_E_T_ <> '*'"),
-            "sc_aberta_fechada": get_indicator_value("COUNT(*)", "SC1010", f"C1_ZZNUMQP LIKE '%{cod_qp}' AND D_E_L_E_T_ <> '*'"),
+            "sc_total": get_indicator_value("COUNT(*)", "SC1010", f"C1_ZZNUMQP LIKE '%{cod_qp}' AND D_E_L_E_T_ <> '*'"),
             "pc_total": get_indicator_value("COUNT(*)", "SC7010", f"C7_ZZNUMQP LIKE '%{cod_qp}' AND D_E_L_E_T_ <> '*'"),
             "mat_entregue": get_indicator_value("COUNT(*)", "SC7010", f"C7_ZZNUMQP LIKE '%{cod_qp}' AND C7_ENCER = 'E' AND D_E_L_E_T_ <> '*'"),
         }
@@ -75,13 +75,13 @@ def percentage_indicators_calculate(data):
     # Verificações para evitar divisões por zero
     for cod_qp, values in data.items():
 
-        if values['op_aberta_fechada'] != 0:
-            indice_producao = (values['op_fechada'] / values['op_aberta_fechada']) * 100
+        if values['op_total'] != 0:
+            indice_producao = (values['op_fechada'] / values['op_total']) * 100
         else:
             indice_producao = 0
 
-        if values['sc_aberta_fechada'] != 0:
-            indice_compra = (values['pc_total'] / values['sc_aberta_fechada']) * 100
+        if values['sc_total'] != 0:
+            indice_compra = (values['pc_total'] / values['sc_total']) * 100
         else:
             indice_compra = 0
 
@@ -103,16 +103,19 @@ def save_totvs_indicator():
         insert_query = text("""
         INSERT INTO 
             enaplic_management.dbo.tb_dashboard_indicators 
-            (cod_qp, vl_open_op, vl_closed_op, vl_all_sc, vl_all_pc, vl_mat_received) 
+            (cod_qp, vl_all_op, vl_closed_op, vl_product_perc, vl_all_sc, vl_all_pc, vl_compras_perc, vl_mat_received, vl_mat_received_perc) 
         VALUES 
-            (:cod_qp, :vl_open_op, :vl_closed_op, :vl_all_sc, :vl_all_pc, :vl_mat_received)
+            (:cod_qp, :vl_all_op, :vl_closed_op, :vl_product_perc, :vl_all_sc, :vl_all_pc, :vl_compras_perc, :vl_mat_received, :vl_mat_received_perc)
         """)
         db.session.execute(insert_query, {
             'cod_qp': cod_qp,
-            'vl_open_op': values['op_aberta_fechada'],
+            'vl_all_op': values['op_total'],
             'vl_closed_op': values['op_fechada'],
-            'vl_all_sc': values['sc_aberta_fechada'],
+            'vl_product_perc': values['indice_producao'],
+            'vl_all_sc': values['sc_total'],
             'vl_all_pc': values['pc_total'],
+            'vl_compras_perc': values['indice_compra'],
             'vl_mat_received': values['mat_entregue'],
+            'vl_mat_received_perc': values['indice_recebimento']
         })
         db.session.commit()
