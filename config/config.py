@@ -1,4 +1,4 @@
-from app.setup_mssql import setup_mssql
+from app.extensions.setup_mssql import setup_mssql
 
 username, password, database, server = setup_mssql()
 

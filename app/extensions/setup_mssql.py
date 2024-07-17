@@ -1,7 +1,7 @@
 import os
 import sys
 import ctypes
-from .extensions.show_message_tk import exibir_mensagem
+from app.extensions.show_message_tk import exibir_mensagem
 
 def setup_mssql():
     caminho_do_arquivo = (r"\\192.175.175.4\f\INTEGRANTES\ELIEZER\PROJETO SOLIDWORKS "

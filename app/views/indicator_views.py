@@ -29,12 +29,12 @@ def scheduled_task_insert_totvs_indicators():
     try:
         requests.post('http://localhost:5000/refresh-totvs-indicators')
         print("Atualização de indicadores realizada com sucesso!")
-    except requests.exceptions.ConnectionError as e:
-        print(f"Erro de conexão: {e}")
+    except requests.exceptions.ConnectionError as ex:
+        print(f"Erro de conexão: {ex}")
 
 if __name__ == '__main__':
     scheduler = BackgroundScheduler()
-    scheduler.add_job(scheduled_task_insert_totvs_indicators, 'interval', days=1)
+    scheduler.add_job(scheduled_task_insert_totvs_indicators, 'interval', days=5)
     scheduler.start()
 
     app.run(host='0.0.0.0', port=5000, use_reloader=False, debug=True)

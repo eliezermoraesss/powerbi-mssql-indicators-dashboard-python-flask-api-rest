@@ -23,27 +23,28 @@ def get_all_indicators():
     }
 
     for cod_qp in cod_qps:
-        data[cod_qp] = {}
+        cod_qp_formatado = cod_qp.lstrip('0')
+        data[cod_qp_formatado] = {}
         for key, indicator in indicators.items():
-            data[cod_qp][key] = get_indicator_value(f"TOP 1 {indicator}",
+            data[cod_qp_formatado][key] = get_indicator_value(f"TOP 1 {indicator}",
                                                     "enaplic_management.dbo.tb_dashboard_indicators",
-                                                    f"cod_qp LIKE '%{cod_qp}' ORDER BY id DESC")
+                                                    f"cod_qp LIKE '%{cod_qp_formatado}' ORDER BY id DESC")
 
         # Adiciona os valores que dependem de contagens específicas
-        data[cod_qp]["op_total"] = get_indicator_value("COUNT(*)", "SC2010",
-                                                                f"C2_ZZNUMQP LIKE '%{cod_qp}' AND D_E_L_E_T_ <> '*'")
+        data[cod_qp_formatado]["op_total"] = get_indicator_value("COUNT(*)", "PROTHEUS12_R27.dbo.SC2010",
+                                                                f"C2_ZZNUMQP LIKE '%{cod_qp_formatado}' AND D_E_L_E_T_ <> '*'")
 
-        data[cod_qp]["op_fechada"] = get_indicator_value("COUNT(*)", "SC2010",
-                                                         f"C2_ZZNUMQP LIKE '%{cod_qp}' AND C2_DATRF <> '       ' AND D_E_L_E_T_ <> '*'")
+        data[cod_qp_formatado]["op_fechada"] = get_indicator_value("COUNT(*)", "PROTHEUS12_R27.dbo.SC2010",
+                                                         f"C2_ZZNUMQP LIKE '%{cod_qp_formatado}' AND C2_DATRF <> '       ' AND D_E_L_E_T_ <> '*'")
 
-        data[cod_qp]["sc_total"] = get_indicator_value("COUNT(*)", "SC1010",
-                                                                f"C1_ZZNUMQP LIKE '%{cod_qp}' AND D_E_L_E_T_ <> '*'")
+        data[cod_qp_formatado]["sc_total"] = get_indicator_value("COUNT(*)", "PROTHEUS12_R27.dbo.SC1010",
+                                                                f"C1_ZZNUMQP LIKE '%{cod_qp_formatado}' AND D_E_L_E_T_ <> '*'")
 
-        data[cod_qp]["pc_total"] = get_indicator_value("COUNT(*)", "SC7010",
-                                                       f"C7_ZZNUMQP LIKE '%{cod_qp}' AND D_E_L_E_T_ <> '*'")
+        data[cod_qp_formatado]["pc_total"] = get_indicator_value("COUNT(*)", "PROTHEUS12_R27.dbo.SC7010",
+                                                       f"C7_ZZNUMQP LIKE '%{cod_qp_formatado}' AND D_E_L_E_T_ <> '*'")
 
-        data[cod_qp]["mat_entregue"] = get_indicator_value("COUNT(*)", "SC7010",
-                                                           f"C7_ZZNUMQP LIKE '%{cod_qp}' AND C7_ENCER = 'E' AND D_E_L_E_T_ <> '*'")
+        data[cod_qp_formatado]["mat_entregue"] = get_indicator_value("COUNT(*)", "PROTHEUS12_R27.dbo.SC7010",
+                                                           f"C7_ZZNUMQP LIKE '%{cod_qp_formatado}' AND C7_ENCER = 'E' AND D_E_L_E_T_ <> '*'")
 
     data = percentage_indicators_calculate(data)
 
@@ -56,12 +57,13 @@ def get_all_totvs_indicators():
 
     data = {}
     for cod_qp in cod_qps:
-        data[cod_qp] = {
-            "op_total": get_indicator_value("COUNT(*)", "SC2010", f"C2_ZZNUMQP LIKE '%{cod_qp}' AND D_E_L_E_T_ <> '*'"),
-            "op_fechada": get_indicator_value("COUNT(*)", "SC2010", f"C2_ZZNUMQP LIKE '%{cod_qp}' AND C2_DATRF <> '       ' AND D_E_L_E_T_ <> '*'"),
-            "sc_total": get_indicator_value("COUNT(*)", "SC1010", f"C1_ZZNUMQP LIKE '%{cod_qp}' AND D_E_L_E_T_ <> '*'"),
-            "pc_total": get_indicator_value("COUNT(*)", "SC7010", f"C7_ZZNUMQP LIKE '%{cod_qp}' AND D_E_L_E_T_ <> '*'"),
-            "mat_entregue": get_indicator_value("COUNT(*)", "SC7010", f"C7_ZZNUMQP LIKE '%{cod_qp}' AND C7_ENCER = 'E' AND D_E_L_E_T_ <> '*'"),
+        cod_qp_formatado = cod_qp.lstrip('0')
+        data[cod_qp_formatado] = {
+            "op_total": get_indicator_value("COUNT(*)", "PROTHEUS12_R27.dbo.SC2010", f"C2_ZZNUMQP LIKE '%{cod_qp_formatado}' AND D_E_L_E_T_ <> '*'"),
+            "op_fechada": get_indicator_value("COUNT(*)", "PROTHEUS12_R27.dbo.SC2010", f"C2_ZZNUMQP LIKE '%{cod_qp_formatado}' AND C2_DATRF <> '       ' AND D_E_L_E_T_ <> '*'"),
+            "sc_total": get_indicator_value("COUNT(*)", "PROTHEUS12_R27.dbo.SC1010", f"C1_ZZNUMQP LIKE '%{cod_qp_formatado}' AND D_E_L_E_T_ <> '*'"),
+            "pc_total": get_indicator_value("COUNT(*)", "PROTHEUS12_R27.dbo.SC7010", f"C7_ZZNUMQP LIKE '%{cod_qp_formatado}' AND D_E_L_E_T_ <> '*'"),
+            "mat_entregue": get_indicator_value("COUNT(*)", "PROTHEUS12_R27.dbo.SC7010", f"C7_ZZNUMQP LIKE '%{cod_qp_formatado}' AND C7_ENCER = 'E' AND D_E_L_E_T_ <> '*'"),
         }
 
     return data
