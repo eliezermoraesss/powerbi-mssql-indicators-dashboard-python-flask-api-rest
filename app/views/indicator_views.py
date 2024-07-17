@@ -13,11 +13,11 @@ def home():
 @app.route('/indicators', methods=['GET'])
 def all_indicators():
     try:
-        project_indicators_dataframe = get_project_indicators()
-        data = get_all_indicators(project_indicators_dataframe)
+        data = get_all_indicators()
         return jsonify(data)
     except Exception as e:
         print(f"Erro ao consultar todos os indicadores: {e}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/totvs-indicators', methods=['GET'])
 def all_totvs_indicators():
@@ -32,6 +32,14 @@ def save_totvs_indicators():
     save_totvs_indicator()
     return f"Atualização de indicadores realizada com sucesso!", 200
 
+def scheduled_task_all_indicators():
+    try:
+        print("Executando agendamento...")
+        requests.get('http://localhost:5000/indicators', timeout=None)
+        print("scheduled: visualização de indicadores realizada com sucesso!")
+    except requests.exceptions.ConnectionError as ex:
+        print(f"Erro de conexão: {ex}")
+
 def scheduled_task_insert_totvs_indicators():
     try:
         requests.post('http://localhost:5000/refresh-totvs-indicators')
@@ -41,6 +49,7 @@ def scheduled_task_insert_totvs_indicators():
 
 if __name__ == '__main__':
     scheduler = BackgroundScheduler()
+    scheduler.add_job(scheduled_task_all_indicators, 'interval', seconds=60)
     scheduler.add_job(scheduled_task_insert_totvs_indicators, 'interval', days=5)
     scheduler.start()
 
