@@ -1,7 +1,8 @@
 from app import db
 from sqlalchemy import text
+from app.extensions.sharepoint_project_data import get_sharepoint_project_data
 
-def get_all_indicators():
+def get_all_indicators(dataframe):
     query_qps_em_andamento = text("SELECT cod_qp FROM enaplic_management.dbo.tb_status_qps WHERE status_proj = 'A';")
     cod_qps = db.session.execute(query_qps_em_andamento).fetchall()
     cod_qps = [row[0] for row in cod_qps]
@@ -121,3 +122,7 @@ def save_totvs_indicator():
             'vl_mat_received_perc': values['indice_recebimento']
         })
         db.session.commit()
+
+def get_project_indicators():
+    project_dataframe_indicators = get_sharepoint_project_data()
+    return project_dataframe_indicators

@@ -1,6 +1,6 @@
 from flask import request, jsonify
 from app import create_app
-from app.controllers.indicator_controller import get_all_indicators, get_all_totvs_indicators, save_totvs_indicator
+from app.controllers.indicator_controller import get_all_indicators, get_all_totvs_indicators, save_totvs_indicator, get_project_indicators
 from apscheduler.schedulers.background import BackgroundScheduler
 import requests
 
@@ -12,15 +12,22 @@ def home():
 
 @app.route('/indicators', methods=['GET'])
 def all_indicators():
-    data = get_all_indicators()
-    return jsonify(data)
+    try:
+        project_indicators_dataframe = get_project_indicators()
+        data = get_all_indicators(project_indicators_dataframe)
+        return jsonify(data)
+    except Exception as e:
+        print(f"Erro ao consultar todos os indicadores: {e}")
 
 @app.route('/totvs-indicators', methods=['GET'])
 def all_totvs_indicators():
-    data = get_all_totvs_indicators()
-    return jsonify(data)
+    try:
+        data = get_all_totvs_indicators()
+        return jsonify(data)
+    except Exception as e:
+        print(f"Erro ao consultar os indicadores do TOTVS: {e}")
 
-@app.route('/refresh-totvs-indicators', methods=['POST'])
+@app.route('/refresh-totvs-indicators', methods=['GET', 'POST'])
 def save_totvs_indicators():
     save_totvs_indicator()
     return f"Atualização de indicadores realizada com sucesso!", 200
