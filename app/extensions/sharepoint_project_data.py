@@ -2,8 +2,10 @@ import os
 import win32com.client as win32
 import pandas as pd
 import tempfile
+import pythoncom
 
 def get_sharepoint_project_data():
+    pythoncom.CoInitialize()
     file_name = 'PROJ_INDICATORS.xlsm'
 
     # Caminho para o arquivo Excel
@@ -52,3 +54,4 @@ def get_sharepoint_project_data():
             # Fecha o Excel somente se criamos uma nova instância
             if new_instance:
                 excel_app.Quit()
+            pythoncom.CoUninitialize()

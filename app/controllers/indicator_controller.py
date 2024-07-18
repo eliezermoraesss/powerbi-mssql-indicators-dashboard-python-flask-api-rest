@@ -2,21 +2,10 @@ from app import db
 from sqlalchemy import text
 from app.extensions.sharepoint_project_data import get_sharepoint_project_data
 
-import os
-import win32com.client as win32
-import pandas as pd
-import tempfile
-import pythoncom
-
 indicators_table = "tb_dashboard_indicators"
-open_qps_table = "tb_open_qp"
+open_qps_table = "tb_open_qps"
 
 def get_all_indicators():
-
-    pythoncom.CoInitialize()
-    dataframe = get_sharepoint_project_data()
-    pythoncom.CoUninitialize()
-    print(dataframe)
 
     query_qps_em_andamento = text(f"SELECT cod_qp FROM enaplic_management.dbo.{open_qps_table} WHERE status_proj = 'A';")
     cod_qps = db.session.execute(query_qps_em_andamento).fetchall()
@@ -118,9 +107,8 @@ def percentage_indicators_calculate(data):
 
 def save_indicators():
     data = get_all_indicators()
-
     for cod_qp, values in data.items():
-
+        cod_qp_formatted = cod_qp.zfill(6)
         insert_query = text(f"""
         INSERT INTO 
             enaplic_management.dbo.{indicators_table} 
@@ -130,7 +118,7 @@ def save_indicators():
         """)
 
         db.session.execute(insert_query, {
-            'cod_qp': cod_qp,
+            'cod_qp': cod_qp_formatted,
             'vl_all_op': values['op_total'],
             'vl_closed_op': values['op_fechada'],
             'vl_product_perc': values['indice_producao'],
@@ -142,3 +130,9 @@ def save_indicators():
         })
 
         db.session.commit()
+
+def get_project_data():
+    dataframe = get_sharepoint_project_data()
+    print(dataframe.to_string())
+    return dataframe
+
