@@ -54,7 +54,6 @@ def scheduled_task_all_indicators():
     except requests.exceptions.ConnectionError as ex:
         print(f"Erro de conexão: {ex}")
 
-
 def scheduled_task_all_project_indicators():
     try:
         print("Executando agendamento: Visualização de Indicadores de Projetos...")
@@ -75,7 +74,7 @@ def scheduled_task_save_totvs_indicators():
 
 if __name__ == '__main__':
     scheduler = BackgroundScheduler()
-    scheduler.add_job(scheduled_task_all_project_indicators, 'interval', days=10)
+    scheduler.add_job(scheduled_task_all_project_indicators, 'interval', seconds=10)
     scheduler.add_job(scheduled_task_save_totvs_indicators, 'interval', days=5)
     scheduler.start()
 

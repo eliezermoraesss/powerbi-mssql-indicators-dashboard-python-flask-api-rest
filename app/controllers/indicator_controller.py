@@ -134,5 +134,25 @@ def save_indicators():
 def get_project_data():
     dataframe = get_sharepoint_project_data()
     print(dataframe.to_string())
+
+    open_qps_list = dataframe["QP_CLIENTE"]
+    open_qps_formatted = [qps.split('-')[1].replace('E', '').strip().zfill(6) for qps in open_qps_list]
+
+    remove_duplicates_qps = set(open_qps_formatted)
+    open_qps = list(remove_duplicates_qps)
+
+    print(open_qps)
+
+    project_indicators = {
+        "baseline": "vl_proj_all_prod",
+        "desconsiderar": "vl_proj_prod_cancel",
+        "indice_mudanca": "vl_proj_modify_perc",
+        "projeto_liberado": "vl_proj_released",
+        "projeto_pronto": "vl_proj_finished",
+        "em_ajuste": "vl_proj_adjusted",
+        "quant_pi_proj": "vl_proj_pi",
+        "quant_mp_proj": "vl_proj_mp"
+    }
+
     return dataframe
 
