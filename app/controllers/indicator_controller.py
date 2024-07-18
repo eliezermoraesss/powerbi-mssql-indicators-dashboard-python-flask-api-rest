@@ -8,18 +8,22 @@ import pandas as pd
 import tempfile
 import pythoncom
 
+indicators_table = "tb_dashboard_indicators"
+open_qps_table = "tb_open_qp"
+
 def get_all_indicators():
 
     pythoncom.CoInitialize()
-    dataframe = get_project_indicators()
+    dataframe = get_sharepoint_project_data()
     pythoncom.CoUninitialize()
     print(dataframe)
 
-    query_qps_em_andamento = text("SELECT cod_qp FROM enaplic_management.dbo.tb_status_qps WHERE status_proj = 'A';")
+    query_qps_em_andamento = text(f"SELECT cod_qp FROM enaplic_management.dbo.{open_qps_table} WHERE status_proj = 'A';")
     cod_qps = db.session.execute(query_qps_em_andamento).fetchall()
     cod_qps = [row[0] for row in cod_qps]
 
     data = {}
+
     indicators = {
         "baseline": "vl_proj_all_prod",
         "desconsiderar": "vl_proj_prod_cancel",
@@ -40,7 +44,7 @@ def get_all_indicators():
         data[cod_qp_formatado] = {}
         for key, indicator in indicators.items():
             data[cod_qp_formatado][key] = get_indicator_value(f"TOP 1 {indicator}",
-                                                    "enaplic_management.dbo.tb_dashboard_indicators",
+                                                    f"enaplic_management.dbo.{indicators_table}",
                                                     f"cod_qp LIKE '%{cod_qp_formatado}' ORDER BY id DESC")
 
         # Adiciona os valores que dependem de contagens específicas
@@ -59,16 +63,15 @@ def get_all_indicators():
         data[cod_qp_formatado]["mat_entregue"] = get_indicator_value("COUNT(*)", "PROTHEUS12_R27.dbo.SC7010",
                                                            f"C7_ZZNUMQP LIKE '%{cod_qp_formatado}' AND C7_ENCER = 'E' AND D_E_L_E_T_ <> '*'")
 
-    data = percentage_indicators_calculate(data)
-
-    return data
+    return percentage_indicators_calculate(data)
 
 def get_all_totvs_indicators():
-    query_qps_em_andamento = text("SELECT cod_qp FROM enaplic_management.dbo.tb_status_qps WHERE status_proj = 'A';")
+    query_qps_em_andamento = text(f"SELECT cod_qp FROM enaplic_management.dbo.{open_qps_table} WHERE status_proj = 'A';")
     cod_qps = db.session.execute(query_qps_em_andamento).fetchall()
     cod_qps = [row[0] for row in cod_qps]
 
     data = {}
+
     for cod_qp in cod_qps:
         cod_qp_formatado = cod_qp.lstrip('0')
         data[cod_qp_formatado] = {
@@ -82,8 +85,10 @@ def get_all_totvs_indicators():
     return data
 
 def get_indicator_value(select_clause, table_name,where_clause):
+
     query = text(f"SELECT {select_clause} AS value FROM {table_name} WHERE {where_clause};")
     result = db.session.execute(query).fetchone()
+
     return result[0] if result else 0
 
 def percentage_indicators_calculate(data):
@@ -111,17 +116,19 @@ def percentage_indicators_calculate(data):
 
     return data
 
-def save_totvs_indicator():
+def save_indicators():
     data = get_all_indicators()
 
     for cod_qp, values in data.items():
-        insert_query = text("""
+
+        insert_query = text(f"""
         INSERT INTO 
-            enaplic_management.dbo.tb_dashboard_indicators 
+            enaplic_management.dbo.{indicators_table} 
             (cod_qp, vl_all_op, vl_closed_op, vl_product_perc, vl_all_sc, vl_all_pc, vl_compras_perc, vl_mat_received, vl_mat_received_perc) 
         VALUES 
             (:cod_qp, :vl_all_op, :vl_closed_op, :vl_product_perc, :vl_all_sc, :vl_all_pc, :vl_compras_perc, :vl_mat_received, :vl_mat_received_perc)
         """)
+
         db.session.execute(insert_query, {
             'cod_qp': cod_qp,
             'vl_all_op': values['op_total'],
@@ -133,54 +140,5 @@ def save_totvs_indicator():
             'vl_mat_received': values['mat_entregue'],
             'vl_mat_received_perc': values['indice_recebimento']
         })
+
         db.session.commit()
-
-def get_project_indicators():
-    file_name = 'PROJ_INDICATORS.xlsm'
-
-    # Caminho para o arquivo Excel
-    file_path = os.path.join(tempfile.gettempdir(), file_name)
-
-    # Verifica se o arquivo existe
-    if not os.path.exists(file_path):
-        print(f"O arquivo {file_path} não foi encontrado.")
-    else:
-        # Verifica se o Excel já está em execução
-        try:
-            excel_app = win32.GetActiveObject('Excel.Application')
-            new_instance = False
-        except Exception:
-            excel_app = win32.Dispatch('Excel.Application')
-            excel_app.Visible = False  # Mantenha o Excel invisível
-            new_instance = True
-
-        try:
-            # Abre a pasta de trabalho
-            workbook = excel_app.Workbooks.Open(file_path)
-
-            # Executa a macro
-            excel_app.Application.Run('PROJ_INDICATORS.xlsm!Macro2')
-
-            # Espera a macro terminar de executar
-            excel_app.CalculateUntilAsyncQueriesDone()
-
-            # Salva a pasta de trabalho
-            workbook.Save()
-
-            # Lê os dados da planilha "BD" em um DataFrame do Pandas
-            sheet_name = "BD"
-            df = pd.read_excel(file_path, sheet_name=sheet_name)
-
-            return df
-
-            # Exibe as primeiras linhas do DataFrame
-            # print(df)
-
-        except Exception as e:
-            print(f"Ocorreu um erro: {e}")
-        finally:
-            # Fecha a pasta de trabalho
-            workbook.Close(SaveChanges=True)
-            # Fecha o Excel somente se criamos uma nova instância
-            if new_instance:
-                excel_app.Quit()
