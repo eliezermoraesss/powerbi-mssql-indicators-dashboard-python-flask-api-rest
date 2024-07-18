@@ -133,26 +133,32 @@ def save_indicators():
 
 def get_project_data():
     dataframe = get_sharepoint_project_data()
-    print(dataframe.to_string())
+    # print(dataframe.to_string())
+
+    total_rows = len(dataframe)
+
+    chunk_size = 9
+
+    dataframe_dict = {}
 
     open_qps_list = dataframe["QP_CLIENTE"]
-    open_qps_formatted = [qps.split('-')[1].replace('E', '').strip().zfill(6) for qps in open_qps_list]
+    # open_qps_formatted = [qps.split('-')[1].replace('E', '').strip().zfill(6) for qps in open_qps_list]
+
+    open_qps_formatted = []
+    for qp in open_qps_list:
+        open_qps_formatted.append(qp.split('-')[1].replace('E', '').strip().zfill(6))
 
     remove_duplicates_qps = set(open_qps_formatted)
     open_qps = list(remove_duplicates_qps)
 
-    print(open_qps)
+    for i in range(0, total_rows, chunk_size):
+        chunk_df = dataframe.iloc[i:i + chunk_size]
+        qp = chunk_df["QP_CLIENTE"].apply(lambda qp: split('-')[1].replace('E', '').strip().zfill(6))
 
-    project_indicators = {
-        "baseline": "vl_proj_all_prod",
-        "desconsiderar": "vl_proj_prod_cancel",
-        "indice_mudanca": "vl_proj_modify_perc",
-        "projeto_liberado": "vl_proj_released",
-        "projeto_pronto": "vl_proj_finished",
-        "em_ajuste": "vl_proj_adjusted",
-        "quant_pi_proj": "vl_proj_pi",
-        "quant_mp_proj": "vl_proj_mp"
-    }
+        dataframe_dict[qp] = chunk_df
+
+    for key, df in dataframe_dict.items():
+        print(f"{key}:\n{df}\n")
 
     return dataframe
 
