@@ -1,13 +1,15 @@
 from app import db
 from sqlalchemy import text
 from app.extensions.sharepoint_project_data import get_sharepoint_project_data
+import pandas as pd
 
 indicators_table = "tb_dashboard_indicators"
 open_qps_table = "tb_open_qps"
 
-def get_all_indicators():
 
-    query_qps_em_andamento = text(f"SELECT cod_qp FROM enaplic_management.dbo.{open_qps_table} WHERE status_proj = 'A';")
+def get_all_indicators():
+    query_qps_em_andamento = text(
+        f"SELECT cod_qp FROM enaplic_management.dbo.{open_qps_table} WHERE status_proj = 'A';")
     cod_qps = db.session.execute(query_qps_em_andamento).fetchall()
     cod_qps = [row[0] for row in cod_qps]
 
@@ -33,29 +35,31 @@ def get_all_indicators():
         data[cod_qp_formatado] = {}
         for key, indicator in indicators.items():
             data[cod_qp_formatado][key] = get_indicator_value(f"TOP 1 {indicator}",
-                                                    f"enaplic_management.dbo.{indicators_table}",
-                                                    f"cod_qp LIKE '%{cod_qp_formatado}' ORDER BY id DESC")
+                                                              f"enaplic_management.dbo.{indicators_table}",
+                                                              f"cod_qp LIKE '%{cod_qp_formatado}' ORDER BY id DESC")
 
         # Adiciona os valores que dependem de contagens específicas
         data[cod_qp_formatado]["op_total"] = get_indicator_value("COUNT(*)", "PROTHEUS12_R27.dbo.SC2010",
-                                                                f"C2_ZZNUMQP LIKE '%{cod_qp_formatado}' AND D_E_L_E_T_ <> '*'")
+                                                                 f"C2_ZZNUMQP LIKE '%{cod_qp_formatado}' AND D_E_L_E_T_ <> '*'")
 
         data[cod_qp_formatado]["op_fechada"] = get_indicator_value("COUNT(*)", "PROTHEUS12_R27.dbo.SC2010",
-                                                         f"C2_ZZNUMQP LIKE '%{cod_qp_formatado}' AND C2_DATRF <> '       ' AND D_E_L_E_T_ <> '*'")
+                                                                   f"C2_ZZNUMQP LIKE '%{cod_qp_formatado}' AND C2_DATRF <> '       ' AND D_E_L_E_T_ <> '*'")
 
         data[cod_qp_formatado]["sc_total"] = get_indicator_value("COUNT(*)", "PROTHEUS12_R27.dbo.SC1010",
-                                                                f"C1_ZZNUMQP LIKE '%{cod_qp_formatado}' AND D_E_L_E_T_ <> '*'")
+                                                                 f"C1_ZZNUMQP LIKE '%{cod_qp_formatado}' AND D_E_L_E_T_ <> '*'")
 
         data[cod_qp_formatado]["pc_total"] = get_indicator_value("COUNT(*)", "PROTHEUS12_R27.dbo.SC7010",
-                                                       f"C7_ZZNUMQP LIKE '%{cod_qp_formatado}' AND D_E_L_E_T_ <> '*'")
+                                                                 f"C7_ZZNUMQP LIKE '%{cod_qp_formatado}' AND D_E_L_E_T_ <> '*'")
 
         data[cod_qp_formatado]["mat_entregue"] = get_indicator_value("COUNT(*)", "PROTHEUS12_R27.dbo.SC7010",
-                                                           f"C7_ZZNUMQP LIKE '%{cod_qp_formatado}' AND C7_ENCER = 'E' AND D_E_L_E_T_ <> '*'")
+                                                                     f"C7_ZZNUMQP LIKE '%{cod_qp_formatado}' AND C7_ENCER = 'E' AND D_E_L_E_T_ <> '*'")
 
     return percentage_indicators_calculate(data)
 
+
 def get_all_totvs_indicators():
-    query_qps_em_andamento = text(f"SELECT cod_qp FROM enaplic_management.dbo.{open_qps_table} WHERE status_proj = 'A';")
+    query_qps_em_andamento = text(
+        f"SELECT cod_qp FROM enaplic_management.dbo.{open_qps_table} WHERE status_proj = 'A';")
     cod_qps = db.session.execute(query_qps_em_andamento).fetchall()
     cod_qps = [row[0] for row in cod_qps]
 
@@ -64,21 +68,27 @@ def get_all_totvs_indicators():
     for cod_qp in cod_qps:
         cod_qp_formatado = cod_qp.lstrip('0')
         data[cod_qp_formatado] = {
-            "op_total": get_indicator_value("COUNT(*)", "PROTHEUS12_R27.dbo.SC2010", f"C2_ZZNUMQP LIKE '%{cod_qp_formatado}' AND D_E_L_E_T_ <> '*'"),
-            "op_fechada": get_indicator_value("COUNT(*)", "PROTHEUS12_R27.dbo.SC2010", f"C2_ZZNUMQP LIKE '%{cod_qp_formatado}' AND C2_DATRF <> '       ' AND D_E_L_E_T_ <> '*'"),
-            "sc_total": get_indicator_value("COUNT(*)", "PROTHEUS12_R27.dbo.SC1010", f"C1_ZZNUMQP LIKE '%{cod_qp_formatado}' AND D_E_L_E_T_ <> '*'"),
-            "pc_total": get_indicator_value("COUNT(*)", "PROTHEUS12_R27.dbo.SC7010", f"C7_ZZNUMQP LIKE '%{cod_qp_formatado}' AND D_E_L_E_T_ <> '*'"),
-            "mat_entregue": get_indicator_value("COUNT(*)", "PROTHEUS12_R27.dbo.SC7010", f"C7_ZZNUMQP LIKE '%{cod_qp_formatado}' AND C7_ENCER = 'E' AND D_E_L_E_T_ <> '*'"),
+            "op_total": get_indicator_value("COUNT(*)", "PROTHEUS12_R27.dbo.SC2010",
+                                            f"C2_ZZNUMQP LIKE '%{cod_qp_formatado}' AND D_E_L_E_T_ <> '*'"),
+            "op_fechada": get_indicator_value("COUNT(*)", "PROTHEUS12_R27.dbo.SC2010",
+                                              f"C2_ZZNUMQP LIKE '%{cod_qp_formatado}' AND C2_DATRF <> '       ' AND D_E_L_E_T_ <> '*'"),
+            "sc_total": get_indicator_value("COUNT(*)", "PROTHEUS12_R27.dbo.SC1010",
+                                            f"C1_ZZNUMQP LIKE '%{cod_qp_formatado}' AND D_E_L_E_T_ <> '*'"),
+            "pc_total": get_indicator_value("COUNT(*)", "PROTHEUS12_R27.dbo.SC7010",
+                                            f"C7_ZZNUMQP LIKE '%{cod_qp_formatado}' AND D_E_L_E_T_ <> '*'"),
+            "mat_entregue": get_indicator_value("COUNT(*)", "PROTHEUS12_R27.dbo.SC7010",
+                                                f"C7_ZZNUMQP LIKE '%{cod_qp_formatado}' AND C7_ENCER = 'E' AND D_E_L_E_T_ <> '*'"),
         }
 
     return data
 
-def get_indicator_value(select_clause, table_name,where_clause):
 
+def get_indicator_value(select_clause, table_name, where_clause):
     query = text(f"SELECT {select_clause} AS value FROM {table_name} WHERE {where_clause};")
     result = db.session.execute(query).fetchone()
 
     return result[0] if result else 0
+
 
 def percentage_indicators_calculate(data):
     # Verificações para evitar divisões por zero
@@ -104,6 +114,7 @@ def percentage_indicators_calculate(data):
         data[cod_qp]['indice_recebimento'] = round(indice_recebimento, 2)
 
     return data
+
 
 def save_indicators():
     data = get_all_indicators()
@@ -131,34 +142,68 @@ def save_indicators():
 
         db.session.commit()
 
+
 def get_project_data():
     dataframe = get_sharepoint_project_data()
-    # print(dataframe.to_string())
 
-    total_rows = len(dataframe)
-
-    chunk_size = 9
-
+    total_rows = len(dataframe)  # Contar o número total de linhas
+    chunk_size = 9  # Definir o tamanho de cada pedaço (chunk)
     dataframe_dict = {}
+    open_qps = []
 
-    open_qps_list = dataframe["QP_CLIENTE"]
-    # open_qps_formatted = [qps.split('-')[1].replace('E', '').strip().zfill(6) for qps in open_qps_list]
-
-    open_qps_formatted = []
-    for qp in open_qps_list:
-        open_qps_formatted.append(qp.split('-')[1].replace('E', '').strip().zfill(6))
-
-    remove_duplicates_qps = set(open_qps_formatted)
-    open_qps = list(remove_duplicates_qps)
-
+    # Dividir o DataFrame a cada 9 linhas e armazenar no dicionário
     for i in range(0, total_rows, chunk_size):
         chunk_df = dataframe.iloc[i:i + chunk_size]
-        qp = chunk_df["QP_CLIENTE"].apply(lambda qp: split('-')[1].replace('E', '').strip().zfill(6))
+        qp_client = chunk_df["QP_CLIENTE"]
 
-        dataframe_dict[qp] = chunk_df
+        cod_qp = []
+        for qp in qp_client:
+            cod_qp_formatted = qp.split('-')[1].replace('E', '').strip().zfill(6)
+            cod_qp.append(cod_qp_formatted)
+            open_qps.append(cod_qp_formatted)
 
-    for key, df in dataframe_dict.items():
-        print(f"{key}:\n{df}\n")
+        dataframe_dict[cod_qp[0]] = chunk_df
 
+    open_qps = set(open_qps)
+
+    data_proj_indicator = {}
+    for qp in open_qps:
+        df = dataframe_dict[qp]
+
+        status_proj = df[df['ITEM'] == 'BASELINE']['STATUS_PROJETO'].values[0]
+        if status_proj == 'Finalizado':
+            status_proj = 'F'
+        elif status_proj == 'Em andamento':
+            status_proj = 'A'
+        elif status_proj == 'Não iniciado':
+            status_proj = 'N'
+
+        baseline = df[df['ITEM'] == 'BASELINE']['GERAL'].values[0]
+        desconsiderar = df[df['ITEM'] == 'DESCONSIDERAR']['GERAL'].values[0] * -1,
+        indice_mudanca = round((df[df['ITEM'] == 'DESCONSIDERAR']['GERAL'].values[0] /
+                                 df[df['ITEM'] == 'BASELINE']['GERAL'].values[0]) * 100, 2)
+        projeto_liberado = df[df['ITEM'] == 'PROJETO']['GERAL'].values[0]
+        projeto_pronto = df[df['ITEM'] == 'PRONTO']['GERAL'].values[0] * -1
+        em_ajuste = df[df['ITEM'] == 'AJUSTE']['GERAL'].values[0]
+        data_emissao_qp = df[df['ITEM'] == 'BASELINE']['DATA_EMISSAO'].values[0] if not pd.isnull(
+            df[df['ITEM'] == 'BASELINE']['DATA_EMISSAO'].values[0]) else "SEM DATA"
+        prazo_entrega_qp = df[df['ITEM'] == 'BASELINE']['PRAZO_ENTREGA'].values[0] if not pd.isnull(
+            df[df['ITEM'] == 'BASELINE']['PRAZO_ENTREGA'].values[0]) else "SEM DATA"
+        status_proj = status_proj,
+        quant_mp_proj = df[df['ROTULO_2'] == 'PRONTO']['MP'].values[0] * 1
+        quant_pi_proj = df[df['ROTULO_3'] == 'PRONTO']['PI'].values[0] * 1
+
+        data_proj_indicator[qp] = {
+            "baseline": baseline,
+            "desconsiderar": desconsiderar,
+            "indice_mudanca": indice_mudanca,
+            "projeto_liberado": projeto_liberado,
+            "projeto_pronto": projeto_pronto,
+            "em_ajuste": em_ajuste,
+            "data_emissao_qp": data_emissao_qp,
+            "prazo_entrega_qp": prazo_entrega_qp,
+            "status_proj": status_proj,
+            "quant_mp_proj": quant_mp_proj,
+            "quant_pi_proj": quant_pi_proj
+        }
     return dataframe
-
