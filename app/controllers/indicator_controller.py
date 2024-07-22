@@ -7,6 +7,7 @@ indicators_table = "tb_dashboard_indicators"
 open_qps_table = "tb_open_qps"
 
 
+# TODO: corrigir método get_all_indicators()
 def get_all_indicators():
     query_qps_em_andamento = text(
         f"SELECT cod_qp FROM enaplic_management.dbo.{open_qps_table} WHERE status_proj = 'A';")
@@ -54,13 +55,16 @@ def get_all_indicators():
         data[cod_qp_formatado]["mat_entregue"] = get_indicator_value("COUNT(*)", "PROTHEUS12_R27.dbo.SC7010",
                                                                      f"C7_ZZNUMQP LIKE '%{cod_qp_formatado}' AND C7_ENCER = 'E' AND D_E_L_E_T_ <> '*'")
 
-    return percentage_indicators_calculate(data)
+    return add_percentage_indicators(data)
 
 
 def get_all_totvs_indicators():
-    query_qps_em_andamento = text(
-        f"SELECT cod_qp FROM enaplic_management.dbo.{open_qps_table} WHERE status_proj = 'A';")
-    cod_qps = db.session.execute(query_qps_em_andamento).fetchall()
+    query_qps_em_aberto = text(f"""
+        SELECT cod_qp 
+        FROM enaplic_management.dbo.{open_qps_table};
+    """)
+
+    cod_qps = db.session.execute(query_qps_em_aberto).fetchall()
     cod_qps = [row[0] for row in cod_qps]
 
     data = {}
@@ -71,16 +75,20 @@ def get_all_totvs_indicators():
             "op_total": get_indicator_value("COUNT(*)", "PROTHEUS12_R27.dbo.SC2010",
                                             f"C2_ZZNUMQP LIKE '%{cod_qp_formatado}' AND D_E_L_E_T_ <> '*'"),
             "op_fechada": get_indicator_value("COUNT(*)", "PROTHEUS12_R27.dbo.SC2010",
-                                              f"C2_ZZNUMQP LIKE '%{cod_qp_formatado}' AND C2_DATRF <> '       ' AND D_E_L_E_T_ <> '*'"),
+                                              f"C2_ZZNUMQP LIKE '%{cod_qp_formatado}' AND C2_DATRF <> '       ' AND "
+                                              f"D_E_L_E_T_ <> '*'"),
             "sc_total": get_indicator_value("COUNT(*)", "PROTHEUS12_R27.dbo.SC1010",
                                             f"C1_ZZNUMQP LIKE '%{cod_qp_formatado}' AND D_E_L_E_T_ <> '*'"),
             "pc_total": get_indicator_value("COUNT(*)", "PROTHEUS12_R27.dbo.SC7010",
                                             f"C7_ZZNUMQP LIKE '%{cod_qp_formatado}' AND D_E_L_E_T_ <> '*'"),
             "mat_entregue": get_indicator_value("COUNT(*)", "PROTHEUS12_R27.dbo.SC7010",
-                                                f"C7_ZZNUMQP LIKE '%{cod_qp_formatado}' AND C7_ENCER = 'E' AND D_E_L_E_T_ <> '*'"),
+                                                f"C7_ZZNUMQP LIKE '%{cod_qp_formatado}' AND C7_ENCER = 'E' AND "
+                                                f"D_E_L_E_T_ <> '*'"),
         }
 
-    return data
+    totvs_indicators = add_percentage_indicators(data)
+
+    return totvs_indicators
 
 
 def get_indicator_value(select_clause, table_name, where_clause):
@@ -90,24 +98,12 @@ def get_indicator_value(select_clause, table_name, where_clause):
     return result[0] if result else 0
 
 
-def percentage_indicators_calculate(data):
+def add_percentage_indicators(data):
     # Verificações para evitar divisões por zero
     for cod_qp, values in data.items():
-
-        if values['op_total'] != 0:
-            indice_producao = (values['op_fechada'] / values['op_total']) * 100
-        else:
-            indice_producao = 0
-
-        if values['sc_total'] != 0:
-            indice_compra = (values['pc_total'] / values['sc_total']) * 100
-        else:
-            indice_compra = 0
-
-        if values['pc_total'] != 0:
-            indice_recebimento = (values['mat_entregue'] / values['pc_total']) * 100
-        else:
-            indice_recebimento = 0
+        indice_producao = (values['op_fechada'] / values['op_total']) * 100 if values['op_total'] > 0 else 0
+        indice_compra = (values['pc_total'] / values['sc_total']) * 100 if values['sc_total'] > 0 else 0
+        indice_recebimento = (values['mat_entregue'] / values['pc_total']) * 100 if values['pc_total'] > 0 else 0
 
         data[cod_qp]['indice_producao'] = round(indice_producao, 2)
         data[cod_qp]['indice_compra'] = round(indice_compra, 2)
@@ -117,48 +113,83 @@ def percentage_indicators_calculate(data):
 
 
 def save_indicators():
-    data = get_all_indicators()
-    for cod_qp, values in data.items():
-        cod_qp_formatted = cod_qp.zfill(6)
+    project_data = get_project_data()
+    update_open_qps_table(project_data)
+    totvs_indicators = get_all_totvs_indicators()
+
+    for cod_qp, project_indicators in project_data.items():
         insert_query = text(f"""
         INSERT INTO 
-            enaplic_management.dbo.{indicators_table} 
-            (cod_qp, vl_all_op, vl_closed_op, vl_product_perc, vl_all_sc, vl_all_pc, vl_compras_perc, vl_mat_received, vl_mat_received_perc) 
-        VALUES 
-            (:cod_qp, :vl_all_op, :vl_closed_op, :vl_product_perc, :vl_all_sc, :vl_all_pc, :vl_compras_perc, :vl_mat_received, :vl_mat_received_perc)
+        enaplic_management.dbo.{indicators_table} 
+        (cod_qp, des_qp, dt_open_qp, dt_end_qp, status_proj, 
+         vl_proj_all_prod, vl_proj_prod_cancel, vl_proj_modify_perc, 
+         vl_proj_released, vl_proj_finished, vl_proj_adjusted, 
+         vl_proj_pi, vl_proj_mp, vl_all_op, vl_pcp_perc, vl_closed_op, 
+         vl_product_perc, vl_all_sc, vl_all_pc, vl_compras_perc, 
+         vl_mat_received, vl_mat_received_perc) 
+        VALUES
+            (:qp, :description, :data_emissao_qp, :prazo_entrega_qp, :status_proj, 
+             :baseline, :desconsiderar, :indice_mudanca, 
+             :projeto_liberado, :projeto_pronto, :em_ajuste, 
+             :quant_pi_proj, :quant_mp_proj, :op_total, 
+             :indice_pcp, :op_fechada, :indice_producao, 
+             :sc_total, :pc_total, :indice_compra, 
+             :mat_entregue, :indice_recebimento);
         """)
 
+        op_total = totvs_indicators['op_total']
+        quant_pi_proj = totvs_indicators['quant_pi_proj']
+
+        indice_pcp = ((op_total / quant_pi_proj) * 100) if quant_pi_proj > 0 else 0
+
         db.session.execute(insert_query, {
-            'cod_qp': cod_qp_formatted,
-            'vl_all_op': values['op_total'],
-            'vl_closed_op': values['op_fechada'],
-            'vl_product_perc': values['indice_producao'],
-            'vl_all_sc': values['sc_total'],
-            'vl_all_pc': values['pc_total'],
-            'vl_compras_perc': values['indice_compra'],
-            'vl_mat_received': values['mat_entregue'],
-            'vl_mat_received_perc': values['indice_recebimento']
+            'qp': cod_qp,
+            'description': project_indicators['description'],
+            'data_emissao_qp': project_indicators['data_emissao_qp'],
+            'prazo_entrega_qp': project_indicators['prazo_entrega_qp'],
+            'status_proj': project_indicators['status_proj'],
+            'baseline': project_indicators['baseline'],
+            'desconsiderar': project_indicators['desconsiderar'],
+            'indice_mudanca': project_indicators['indice_mudanca'],
+            'projeto_liberado': project_indicators['projeto_liberado'],
+            'projeto_pronto': project_indicators['projeto_pronto'],
+            'em_ajuste': project_indicators['em_ajuste'],
+            'quant_pi_proj': project_indicators['quant_pi_proj'],
+            'quant_mp_proj': project_indicators['quant_mp_proj'],
+            'op_total': totvs_indicators['op_total'],
+            'indice_pcp': indice_pcp,
+            'indice_producao': totvs_indicators['indice_producao'],
+            'op_fechada': totvs_indicators['op_fechada'],
+            'sc_total': totvs_indicators['sc_total'],
+            'pc_total': totvs_indicators['pc_total'],
+            'indice_compra': totvs_indicators['indice_compra'],
+            'mat_entregue': totvs_indicators['mat_entregue'],
+            'indice_recebimento': totvs_indicators['indice_recebimento']
         })
 
         db.session.commit()
 
 
 def update_open_qps_table(data_proj_indicator):
-    for cod_qp, qp_indicators in data_proj_indicator.items():
-        if not get_open_qps(cod_qp):
-            insert_open_qps_query = text(f"""
-                INSERT INTO 
-                    enaplic_management.dbo.{open_qps_table} 
-                    (cod_qp, des_qp, dt_open_qp, dt_end_qp, status_proj) 
-                VALUES(:qp, :description, :data_emissao, :prazo_entrega);
-                """)
+    try:
+        for cod_qp, qp_indicators in data_proj_indicator.items():
+            if not get_open_qps(cod_qp):
+                insert_open_qps_query = text(f"""
+                    INSERT INTO 
+                        enaplic_management.dbo.{open_qps_table} 
+                        (cod_qp, des_qp, dt_open_qp, dt_end_qp, status_proj) 
+                    VALUES(:qp, :description, :data_emissao, :prazo_entrega);
+                    """)
 
-            db.session.execute(insert_open_qps_query, {
-                'qp': cod_qp,
-                'description': qp_indicators['description'],
-                'data_emissao': qp_indicators['data_emissao_qp'],
-                'prazo_entrega': qp_indicators['prazo_entrega_qp']
-            })
+                db.session.execute(insert_open_qps_query, {
+                    'qp': cod_qp,
+                    'description': qp_indicators['description'],
+                    'data_emissao': qp_indicators['data_emissao_qp'],
+                    'prazo_entrega': qp_indicators['prazo_entrega_qp']
+                })
+                db.session.commit()
+    except Exception as e:
+        print(f"Erro ao atualizar tabela de QPs EM ABERTO: {e}")
 
 
 def get_project_data():
