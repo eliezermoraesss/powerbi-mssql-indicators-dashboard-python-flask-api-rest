@@ -4,6 +4,7 @@ import pandas as pd
 import tempfile
 import pythoncom
 
+
 def get_sharepoint_project_data():
     pythoncom.CoInitialize()
     file_name = 'PROJ_INDICATORS.xlsm'

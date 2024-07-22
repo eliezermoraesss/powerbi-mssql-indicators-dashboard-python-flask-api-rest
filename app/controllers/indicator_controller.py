@@ -179,21 +179,33 @@ def get_project_data():
             status_proj = 'N'
 
         baseline = df[df['ITEM'] == 'BASELINE']['GERAL'].values[0]
-        desconsiderar = df[df['ITEM'] == 'DESCONSIDERAR']['GERAL'].values[0] * -1,
-        indice_mudanca = round((df[df['ITEM'] == 'DESCONSIDERAR']['GERAL'].values[0] /
-                                 df[df['ITEM'] == 'BASELINE']['GERAL'].values[0]) * 100, 2)
+        desconsiderar = df[df['ITEM'] == 'DESCONSIDERAR']['GERAL'].values[0] * -1
+        indice_mudanca = round((desconsiderar / baseline) * 100, 2)
+
+        if baseline == 0:
+            indice_mudanca = 0
+
         projeto_liberado = df[df['ITEM'] == 'PROJETO']['GERAL'].values[0]
         projeto_pronto = df[df['ITEM'] == 'PRONTO']['GERAL'].values[0] * -1
-        em_ajuste = df[df['ITEM'] == 'AJUSTE']['GERAL'].values[0]
-        data_emissao_qp = df[df['ITEM'] == 'BASELINE']['DATA_EMISSAO'].values[0] if not pd.isnull(
-            df[df['ITEM'] == 'BASELINE']['DATA_EMISSAO'].values[0]) else "SEM DATA"
-        prazo_entrega_qp = df[df['ITEM'] == 'BASELINE']['PRAZO_ENTREGA'].values[0] if not pd.isnull(
-            df[df['ITEM'] == 'BASELINE']['PRAZO_ENTREGA'].values[0]) else "SEM DATA"
-        status_proj = status_proj,
-        quant_mp_proj = df[df['ROTULO_2'] == 'PRONTO']['MP'].values[0] * 1
-        quant_pi_proj = df[df['ROTULO_3'] == 'PRONTO']['PI'].values[0] * 1
+        em_ajuste = df[df['ITEM'] == 'AJUSTE']['GERAL'].values[0] * -1
+
+        data_emissao_qp = df[df['ITEM'] == 'BASELINE']['DATA_EMISSAO'].values[0]
+        if pd.isnull(data_emissao_qp):
+            data_emissao_qp = 'SEM DATA'
+        else:
+            data_emissao_qp = pd.to_datetime(data_emissao_qp).strftime('%d/%m/%Y')
+
+        prazo_entrega_qp = df[df['ITEM'] == 'BASELINE']['PRAZO_ENTREGA'].values[0]
+        if pd.isnull(prazo_entrega_qp):
+            prazo_entrega_qp = "SEM DATA"
+        else:
+            prazo_entrega_qp = pd.to_datetime(prazo_entrega_qp).strftime('%d/%m/%Y')
+
+        quant_mp_proj = df[df['ITEM'] == 'PRONTO']['MP'].values[0] * -1
+        quant_pi_proj = df[df['ITEM'] == 'PRONTO']['PI'].values[0] * -1
 
         data_proj_indicator[qp] = {
+            "qp": qp,
             "baseline": baseline,
             "desconsiderar": desconsiderar,
             "indice_mudanca": indice_mudanca,
@@ -206,4 +218,4 @@ def get_project_data():
             "quant_mp_proj": quant_mp_proj,
             "quant_pi_proj": quant_pi_proj
         }
-    return dataframe
+    return data_proj_indicator

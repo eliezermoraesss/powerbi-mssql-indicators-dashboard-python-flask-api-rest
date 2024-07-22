@@ -89,7 +89,7 @@ if __name__ == '__main__':
     # pydevd_pycharm.settrace('localhost', port=59333, stdoutToServer=True, stderrToServer=True)
 
     scheduler = BackgroundScheduler()
-    scheduler.add_job(scheduled_task_all_project_indicators, 'interval', minutes=30)
+    scheduler.add_job(scheduled_task_all_project_indicators, 'interval', seconds=30)
     scheduler.start()
 
     app.run(host='0.0.0.0', port=5000, use_reloader=False, debug=True)
