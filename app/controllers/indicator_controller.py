@@ -143,13 +143,31 @@ def save_indicators():
         db.session.commit()
 
 
+def update_open_qps_table(data_proj_indicator):
+    for cod_qp, qp_indicators in data_proj_indicator.items():
+        if not get_open_qps(cod_qp):
+            insert_open_qps_query = text(f"""
+                INSERT INTO 
+                    enaplic_management.dbo.{open_qps_table} 
+                    (cod_qp, des_qp, dt_open_qp, dt_end_qp, status_proj) 
+                VALUES(:qp, :description, :data_emissao, :prazo_entrega);
+                """)
+
+            db.session.execute(insert_open_qps_query, {
+                'qp': cod_qp,
+                'description': qp_indicators['description'],
+                'data_emissao': qp_indicators['data_emissao_qp'],
+                'prazo_entrega': qp_indicators['prazo_entrega_qp']
+            })
+
+
 def get_project_data():
     dataframe = get_sharepoint_project_data()
 
     total_rows = len(dataframe)  # Contar o número total de linhas
     chunk_size = 9  # Definir o tamanho de cada pedaço (chunk)
     dataframe_dict = {}
-    open_qps = []
+    qps_description_dict = {}
 
     # Dividir o DataFrame a cada 9 linhas e armazenar no dicionário
     for i in range(0, total_rows, chunk_size):
@@ -157,17 +175,17 @@ def get_project_data():
         qp_client = chunk_df["QP_CLIENTE"]
 
         cod_qp = []
-        for qp in qp_client:
-            cod_qp_formatted = qp.split('-')[1].replace('E', '').strip().zfill(6)
+        for cell in qp_client:
+            cod_qp_formatted = cell.split('-')[1].replace('E', '').strip().zfill(6)
+            desc_qp = clean_string(cell)
+
             cod_qp.append(cod_qp_formatted)
-            open_qps.append(cod_qp_formatted)
+            qps_description_dict[cod_qp_formatted] = desc_qp
 
         dataframe_dict[cod_qp[0]] = chunk_df
 
-    open_qps = set(open_qps)
-
     data_proj_indicator = {}
-    for qp in open_qps:
+    for qp, description in qps_description_dict.items():
         df = dataframe_dict[qp]
 
         status_proj = df[df['ITEM'] == 'BASELINE']['STATUS_PROJETO'].values[0]
@@ -180,10 +198,11 @@ def get_project_data():
 
         baseline = df[df['ITEM'] == 'BASELINE']['GERAL'].values[0]
         desconsiderar = df[df['ITEM'] == 'DESCONSIDERAR']['GERAL'].values[0] * -1
-        indice_mudanca = round((desconsiderar / baseline) * 100, 2)
 
         if baseline == 0:
             indice_mudanca = 0
+        else:
+            indice_mudanca = round((desconsiderar / baseline) * 100, 2)
 
         projeto_liberado = df[df['ITEM'] == 'PROJETO']['GERAL'].values[0]
         projeto_pronto = df[df['ITEM'] == 'PRONTO']['GERAL'].values[0] * -1
@@ -206,6 +225,7 @@ def get_project_data():
 
         data_proj_indicator[qp] = {
             "qp": qp,
+            "description": description,
             "baseline": baseline,
             "desconsiderar": desconsiderar,
             "indice_mudanca": indice_mudanca,
@@ -219,3 +239,21 @@ def get_project_data():
             "quant_pi_proj": quant_pi_proj
         }
     return data_proj_indicator
+
+
+def get_open_qps(qp):
+    query_open = text(f"""
+        SELECT 1 
+        FROM enaplic_management.dbo.{open_qps_table}
+        WHERE cod_qp = :qp
+    """)
+    result = db.session.execute(query_open, {'qp': qp}).fetchone()
+
+    return result is not None
+
+
+def clean_string(input_string):
+    substring = input_string[8:]
+    cleaned_string = substring.replace('-', '').replace('.xlsm', '').strip()
+
+    return cleaned_string
