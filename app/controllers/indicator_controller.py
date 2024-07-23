@@ -7,11 +7,14 @@ indicators_table = "tb_dashboard_indicators"
 open_qps_table = "tb_open_qps"
 
 
-# TODO: corrigir método get_all_indicators()
 def get_all_indicators():
-    query_qps_em_andamento = text(
-        f"SELECT cod_qp FROM enaplic_management.dbo.{open_qps_table} WHERE status_proj = 'A';")
-    cod_qps = db.session.execute(query_qps_em_andamento).fetchall()
+    query_qps_em_aberto = text(f"""
+    SELECT
+        cod_qp
+    FROM 
+        enaplic_management.dbo.{open_qps_table};""")
+
+    cod_qps = db.session.execute(query_qps_em_aberto).fetchall()
     cod_qps = [row[0] for row in cod_qps]
 
     data = {}
@@ -25,37 +28,25 @@ def get_all_indicators():
         "em_ajuste": "vl_proj_adjusted",
         "quant_pi_proj": "vl_proj_pi",
         "quant_mp_proj": "vl_proj_mp",
+        "op_total": "vl_all_op",
         "indice_pcp": "vl_pcp_perc",
+        "op_fechada": "vl_closed_op",
         "indice_producao": "vl_product_perc",
+        "sc_total": "vl_all_sc",
+        "pc_total": "vl_all_pc",
         "indice_compra": "vl_compras_perc",
+        "mat_entregue": "vl_mat_received",
         "indice_recebimento": "vl_mat_received_perc"
     }
 
     for cod_qp in cod_qps:
         cod_qp_formatado = cod_qp.lstrip('0')
-        data[cod_qp_formatado] = {}
-        for key, indicator in indicators.items():
-            data[cod_qp_formatado][key] = get_indicator_value(f"TOP 1 {indicator}",
-                                                              f"enaplic_management.dbo.{indicators_table}",
-                                                              f"cod_qp LIKE '%{cod_qp_formatado}' ORDER BY id DESC")
-
-        # Adiciona os valores que dependem de contagens específicas
-        data[cod_qp_formatado]["op_total"] = get_indicator_value("COUNT(*)", "PROTHEUS12_R27.dbo.SC2010",
-                                                                 f"C2_ZZNUMQP LIKE '%{cod_qp_formatado}' AND D_E_L_E_T_ <> '*'")
-
-        data[cod_qp_formatado]["op_fechada"] = get_indicator_value("COUNT(*)", "PROTHEUS12_R27.dbo.SC2010",
-                                                                   f"C2_ZZNUMQP LIKE '%{cod_qp_formatado}' AND C2_DATRF <> '       ' AND D_E_L_E_T_ <> '*'")
-
-        data[cod_qp_formatado]["sc_total"] = get_indicator_value("COUNT(*)", "PROTHEUS12_R27.dbo.SC1010",
-                                                                 f"C1_ZZNUMQP LIKE '%{cod_qp_formatado}' AND D_E_L_E_T_ <> '*'")
-
-        data[cod_qp_formatado]["pc_total"] = get_indicator_value("COUNT(*)", "PROTHEUS12_R27.dbo.SC7010",
-                                                                 f"C7_ZZNUMQP LIKE '%{cod_qp_formatado}' AND D_E_L_E_T_ <> '*'")
-
-        data[cod_qp_formatado]["mat_entregue"] = get_indicator_value("COUNT(*)", "PROTHEUS12_R27.dbo.SC7010",
-                                                                     f"C7_ZZNUMQP LIKE '%{cod_qp_formatado}' AND C7_ENCER = 'E' AND D_E_L_E_T_ <> '*'")
-
-    return add_percentage_indicators(data)
+        data[cod_qp] = {}
+        for key, value in indicators.items():
+            data[cod_qp][key] = get_indicator_value(f"TOP 1 {value}",
+                                                    f"enaplic_management.dbo.{indicators_table}",
+                                                    f"cod_qp LIKE '%{cod_qp_formatado}' ORDER BY id DESC")
+    return data
 
 
 def get_all_totvs_indicators():
