@@ -86,11 +86,21 @@ def scheduled_task_save_totvs_indicators():
         print(f"Erro de conexão: {ex}")
 
 
+def scheduled_task_save_all_indicators():
+    try:
+        print("Executando agendamento: Atualização de todos indicadores...")
+        requests.post('http://localhost:5000/indicators/save', timeout=None)
+        print("scheduled: Atualização e salvamento dos Indicadores realizada com sucesso!")
+
+    except requests.exceptions.ConnectionError as ex:
+        print(f"Erro de conexão: {ex}")
+
+
 if __name__ == '__main__':
     # pydevd_pycharm.settrace('localhost', port=59333, stdoutToServer=True, stderrToServer=True)
 
     scheduler = BackgroundScheduler()
-    scheduler.add_job(scheduled_task_all_project_indicators, 'interval', seconds=10)
+    scheduler.add_job(scheduled_task_save_all_indicators, 'interval', seconds=10)
     scheduler.start()
 
     app.run(host='0.0.0.0', port=5000, use_reloader=False, debug=True)
