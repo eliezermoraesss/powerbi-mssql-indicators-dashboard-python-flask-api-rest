@@ -39,15 +39,17 @@ def all_totvs_indicators():
 @app.route('/indicators/save', methods=['GET', 'POST'])
 def save_all_indicators():
     try:
+        print("request: Atualização de todos Indicadores em andamento...")
         save_indicators()
-        return f"Atualização de Indicadores realizada com sucesso!", 200
+        print("request: Atualização e salvamento dos Indicadores realizada com sucesso!")
+        return f"Atualização e salvamento dos Indicadores realizada com sucesso!", 201
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 
 def scheduled_task_save_all_indicators():
     try:
-        print("Executando agendamento: Atualização de todos indicadores...")
+        print("scheduled: Atualização de todos Indicadores em andamento...")
         requests.post('http://localhost:5000/indicators/save', timeout=None)
         print("scheduled: Atualização e salvamento dos Indicadores realizada com sucesso!")
 
@@ -57,7 +59,7 @@ def scheduled_task_save_all_indicators():
 
 if __name__ == '__main__':
     scheduler = BackgroundScheduler()
-    scheduler.add_job(scheduled_task_save_all_indicators, 'interval', minutes=30)
+    scheduler.add_job(scheduled_task_save_all_indicators, 'interval', hours=12)
     scheduler.start()
 
     app.run(host='0.0.0.0', port=5000, use_reloader=False, debug=True)

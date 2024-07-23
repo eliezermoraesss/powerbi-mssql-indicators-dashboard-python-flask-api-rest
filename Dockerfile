@@ -5,7 +5,7 @@ FROM python:latest
 WORKDIR /app
 
 # Copiar os arquivos de requisitos e instalar as dependências
-COPY requirements.txt ./
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copiar o restante dos arquivos da aplicação

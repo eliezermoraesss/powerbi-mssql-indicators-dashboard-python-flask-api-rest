@@ -235,13 +235,13 @@ def get_project_data():
 
         data_emissao_qp = df[df['ITEM'] == 'BASELINE']['DATA_EMISSAO'].values[0]
         if pd.isnull(data_emissao_qp):
-            data_emissao_qp = 'SEM DATA'
+            data_emissao_qp = ''
         else:
             data_emissao_qp = pd.to_datetime(data_emissao_qp).strftime('%d/%m/%Y')
 
         prazo_entrega_qp = df[df['ITEM'] == 'BASELINE']['PRAZO_ENTREGA'].values[0]
         if pd.isnull(prazo_entrega_qp):
-            prazo_entrega_qp = "SEM DATA"
+            prazo_entrega_qp = ""
         else:
             prazo_entrega_qp = pd.to_datetime(prazo_entrega_qp).strftime('%d/%m/%Y')
 
@@ -279,6 +279,6 @@ def get_open_qps(qp):
 
 def clean_string(input_string):
     substring = input_string[8:]
-    cleaned_string = substring.replace('-', '').replace('.xlsm', '').strip()
+    cleaned_string = substring.replace('-', '').replace('_NOVA_VERSÃO', '').replace('.xlsm', '').strip()
 
     return cleaned_string
