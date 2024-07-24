@@ -41,7 +41,7 @@ def save_all_indicators():
     try:
         print("request: Atualização de todos Indicadores em andamento...")
         save_indicators()
-        print("request: Atualização e salvamento dos Indicadores realizada com sucesso!")
+        print("response: Atualização e salvamento dos Indicadores realizada com sucesso!")
         return f"Atualização e salvamento dos Indicadores realizada com sucesso!", 201
     except Exception as e:
         return jsonify({"error": str(e)}), 500

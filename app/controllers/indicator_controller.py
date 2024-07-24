@@ -65,16 +65,21 @@ def get_all_totvs_indicators():
         data[cod_qp] = {
             "op_total": get_indicator_value("COUNT(*)", "PROTHEUS12_R27.dbo.SC2010",
                                             f"C2_ZZNUMQP LIKE '%{cod_qp_formatado}' AND D_E_L_E_T_ <> '*'"),
+
             "op_fechada": get_indicator_value("COUNT(*)", "PROTHEUS12_R27.dbo.SC2010",
                                               f"C2_ZZNUMQP LIKE '%{cod_qp_formatado}' AND C2_DATRF <> '       ' AND "
                                               f"D_E_L_E_T_ <> '*'"),
-            "sc_total": get_indicator_value("COUNT(*)", "PROTHEUS12_R27.dbo.SC1010",
+
+            "sc_total": get_indicator_value("COUNT(DISTINCT C1_NUM)", "PROTHEUS12_R27.dbo.SC1010",
                                             f"C1_ZZNUMQP LIKE '%{cod_qp_formatado}' AND D_E_L_E_T_ <> '*'"),
-            "pc_total": get_indicator_value("COUNT(*)", "PROTHEUS12_R27.dbo.SC7010",
-                                            f"C7_ZZNUMQP LIKE '%{cod_qp_formatado}' AND D_E_L_E_T_ <> '*'"),
-            "mat_entregue": get_indicator_value("COUNT(*)", "PROTHEUS12_R27.dbo.SC7010",
+
+            "pc_total": get_indicator_value("COUNT(DISTINCT C7_NUMSC)", "PROTHEUS12_R27.dbo.SC7010",
+                                            f"C7_ZZNUMQP LIKE '%{cod_qp_formatado}' AND C7_NUMSC <> '      ' AND "
+                                            f"D_E_L_E_T_ <> '*'"),
+
+            "mat_entregue": get_indicator_value("COUNT(DISTINCT C7_NUMSC)", "PROTHEUS12_R27.dbo.SC7010",
                                                 f"C7_ZZNUMQP LIKE '%{cod_qp_formatado}' AND C7_ENCER = 'E' AND "
-                                                f"D_E_L_E_T_ <> '*'"),
+                                                f"C7_NUMSC <> '      ' AND D_E_L_E_T_ <> '*'"),
         }
 
     totvs_indicators = add_percentage_indicators(data)
