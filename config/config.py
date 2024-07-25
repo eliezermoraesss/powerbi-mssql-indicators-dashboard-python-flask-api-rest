@@ -6,6 +6,7 @@ driver = 'SQL Server'
 conn_str = f'DRIVER={driver};SERVER={server};UID={username};PWD={password}'
 db_url = f'mssql+pyodbc:///?odbc_connect={conn_str}'
 
+
 class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_DATABASE_URI = db_url
