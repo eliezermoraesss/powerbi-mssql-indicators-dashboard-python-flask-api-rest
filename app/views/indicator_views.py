@@ -1,7 +1,10 @@
-from flask import request, jsonify
+from flask import jsonify, abort
 from app import create_app
-from app.controllers.indicator_controller import get_all_indicators, get_all_totvs_indicators, save_indicators, \
-    get_project_data
+from app.controllers.indicator_controller import (
+    get_all_indicators,
+    get_all_totvs_indicators,
+    save_indicators
+)
 from apscheduler.schedulers.background import BackgroundScheduler
 import requests
 import logging
@@ -22,8 +25,8 @@ def all_indicators():
         response = get_all_indicators()
         return jsonify(response)
     except Exception as e:
-        print(f"Erro ao consultar todos os indicadores: {e}")
-        return jsonify({"error": str(e)}), 500
+        logging.error(f"Erro ao consultar todos os indicadores: {e}")
+        abort(500, description="Internal Server Error")
 
 
 @app.route('/indicators/totvs', methods=['GET'])
@@ -32,34 +35,33 @@ def all_totvs_indicators():
         response = get_all_totvs_indicators()
         return jsonify(response)
     except Exception as e:
-        print(f"Erro ao consultar os indicadores do TOTVS: {e}")
-        return jsonify({"error": str(e)}), 500
+        logging.error(f"Erro ao consultar os indicadores do TOTVS: {e}")
+        abort(500, description="Internal Server Error")
 
 
 @app.route('/indicators/save', methods=['GET', 'POST'])
 def save_all_indicators():
     try:
-        print("request: Atualização de todos Indicadores em andamento...")
+        logging.info("request: Atualização de todos Indicadores em andamento...")
         save_indicators()
-        print("response: Atualização e salvamento dos Indicadores realizada com sucesso!")
-        return f"Atualização e salvamento dos Indicadores realizada com sucesso!", 201
+        logging.info("response: Atualização e salvamento dos Indicadores realizada com sucesso!")
+        return "Atualização e salvamento dos Indicadores realizada com sucesso!", 201
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        logging.error(f"Erro ao salvar os indicadores: {e}")
+        abort(500, description="Internal Server Error")
 
 
 def scheduled_task_save_all_indicators():
     try:
-        print("scheduled: Atualização de todos Indicadores em andamento...")
-        requests.post('http://localhost:5000/indicators/save', timeout=None)
-        print("scheduled: Atualização e salvamento dos Indicadores realizada com sucesso!")
-
+        logging.info("scheduled: Atualização de todos Indicadores em andamento...")
+        requests.post('http://localhost:5000/indicators/save', timeout=600)  # 600 seconds or 10 minutes
+        logging.info("scheduled: Atualização e salvamento dos Indicadores realizada com sucesso!")
     except requests.exceptions.ConnectionError as ex:
-        print(f"Erro de conexão: {ex}")
+        logging.error(f"Erro de conexão: {ex}")
 
 
 if __name__ == '__main__':
     scheduler = BackgroundScheduler()
     scheduler.add_job(scheduled_task_save_all_indicators, 'interval', days=1)
     scheduler.start()
-
     app.run(host='0.0.0.0', port=5000, use_reloader=False, debug=True)
