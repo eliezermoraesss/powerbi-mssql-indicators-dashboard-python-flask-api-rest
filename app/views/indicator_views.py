@@ -59,7 +59,7 @@ def scheduled_task_save_all_indicators():
 
 if __name__ == '__main__':
     scheduler = BackgroundScheduler()
-    scheduler.add_job(scheduled_task_save_all_indicators, 'interval', hours=12)
+    scheduler.add_job(scheduled_task_save_all_indicators, 'interval', days=1)
     scheduler.start()
 
     app.run(host='0.0.0.0', port=5000, use_reloader=False, debug=True)

@@ -36,7 +36,12 @@ def get_all_indicators():
         "pc_total": "vl_all_pc",
         "indice_compra": "vl_compras_perc",
         "mat_entregue": "vl_mat_received",
-        "indice_recebimento": "vl_mat_received_perc"
+        "indice_recebimento": "vl_mat_received_perc",
+        "custo_total_mp_pc": "vl_total_mp_pc_cost",
+        "custo_mp_pc": "vl_mp_pc_cost",
+        "custo_item_com_pc": "vl_com_pc_cost",
+        "custo_mp_mat_entregue": "vl_mp_deliver_cost",
+        "custo_item_com_mat_entregue": "vl_com_deliver_cost"
     }
 
     for cod_qp in cod_qps:
@@ -62,24 +67,52 @@ def get_all_totvs_indicators():
 
     for cod_qp in cod_qps:
         cod_qp_formatado = cod_qp.lstrip('0')
+        op_total = get_indicator_value("COUNT(*)", "PROTHEUS12_R27.dbo.SC2010",
+                                        f"C2_ZZNUMQP LIKE '%{cod_qp_formatado}' AND D_E_L_E_T_ <> '*'")
+
+        op_fechada = get_indicator_value("COUNT(*)", "PROTHEUS12_R27.dbo.SC2010",
+                                          f"C2_ZZNUMQP LIKE '%{cod_qp_formatado}' AND C2_DATRF <> '       ' AND "
+                                          f"D_E_L_E_T_ <> '*'")
+
+        sc_total = get_indicator_value("COUNT(DISTINCT (C1_NUM + C1_ITEM))", "PROTHEUS12_R27.dbo.SC1010",
+                                        f"C1_ZZNUMQP LIKE '%{cod_qp_formatado}' AND D_E_L_E_T_ <> '*'")
+
+        pc_total = get_indicator_value("COUNT(DISTINCT (C7_NUM + C7_ITEM))", "PROTHEUS12_R27.dbo.SC7010",
+                                        f"C7_ZZNUMQP LIKE '%{cod_qp_formatado}' AND C7_NUMSC <> '      ' AND "
+                                        f"D_E_L_E_T_ <> '*'")
+
+        mat_entregue = get_indicator_value("COUNT(DISTINCT (C7_NUM + C7_ITEM))", "PROTHEUS12_R27.dbo.SC7010",
+                                            f"C7_ZZNUMQP LIKE '%{cod_qp_formatado}' AND C7_ENCER = 'E' AND "
+                                            f"C7_NUMSC <> '      ' AND D_E_L_E_T_ <> '*'")
+
+        custo_mp_pc = get_indicator_value("ROUND(SUM(C7_TOTAL), 2)", "PROTHEUS12_R27.dbo.SC7010",
+                                           f"C7_ZZNUMQP LIKE '%{cod_qp_formatado}' AND C7_LOCAL = '01' AND "
+                                           f"D_E_L_E_T_ <> '*'")
+
+        custo_item_com_pc = get_indicator_value("ROUND(SUM(C7_TOTAL), 2)", "PROTHEUS12_R27.dbo.SC7010",
+                                                 f"C7_ZZNUMQP LIKE '%{cod_qp_formatado}' AND C7_LOCAL <> '01' AND "
+                                                 f"D_E_L_E_T_ <> '*'")
+
+        custo_mp_mat_entregue = get_indicator_value("ROUND(SUM(C7_TOTAL), 2)", "PROTHEUS12_R27.dbo.SC7010",
+                                                     f"C7_ZZNUMQP LIKE '%{cod_qp_formatado}' AND C7_NUMSC <> '    "
+                                                     f"  ' AND C7_ENCER = 'E' AND C7_LOCAL = '01' AND D_E_L_E_T_ "
+                                                     f"<> '*'")
+
+        custo_item_com_mat_entregue = get_indicator_value("ROUND(SUM(C7_TOTAL), 2)", "PROTHEUS12_R27.dbo.SC7010",
+                                                           f"C7_ZZNUMQP LIKE '%{cod_qp_formatado}' AND C7_NUMSC "
+                                                           f"<> '      ' AND C7_ENCER = 'E' AND C7_LOCAL <> '01' "
+                                                           f"AND D_E_L_E_T_ <> '*'")
         data[cod_qp] = {
-            "op_total": get_indicator_value("COUNT(*)", "PROTHEUS12_R27.dbo.SC2010",
-                                            f"C2_ZZNUMQP LIKE '%{cod_qp_formatado}' AND D_E_L_E_T_ <> '*'"),
-
-            "op_fechada": get_indicator_value("COUNT(*)", "PROTHEUS12_R27.dbo.SC2010",
-                                              f"C2_ZZNUMQP LIKE '%{cod_qp_formatado}' AND C2_DATRF <> '       ' AND "
-                                              f"D_E_L_E_T_ <> '*'"),
-
-            "sc_total": get_indicator_value("COUNT(DISTINCT C1_NUM)", "PROTHEUS12_R27.dbo.SC1010",
-                                            f"C1_ZZNUMQP LIKE '%{cod_qp_formatado}' AND D_E_L_E_T_ <> '*'"),
-
-            "pc_total": get_indicator_value("COUNT(DISTINCT C7_NUMSC)", "PROTHEUS12_R27.dbo.SC7010",
-                                            f"C7_ZZNUMQP LIKE '%{cod_qp_formatado}' AND C7_NUMSC <> '      ' AND "
-                                            f"D_E_L_E_T_ <> '*'"),
-
-            "mat_entregue": get_indicator_value("COUNT(DISTINCT C7_NUMSC)", "PROTHEUS12_R27.dbo.SC7010",
-                                                f"C7_ZZNUMQP LIKE '%{cod_qp_formatado}' AND C7_ENCER = 'E' AND "
-                                                f"C7_NUMSC <> '      ' AND D_E_L_E_T_ <> '*'"),
+            "op_total": op_total,
+            "op_fechada": op_fechada,
+            "sc_total": sc_total,
+            "pc_total": pc_total,
+            "mat_entregue": mat_entregue,
+            "custo_total_mp_pc": round(custo_mp_pc + custo_item_com_pc, 2),
+            "custo_mp_pc": custo_mp_pc,
+            "custo_item_com_pc": custo_item_com_pc,
+            "custo_mp_mat_entregue": custo_mp_mat_entregue,
+            "custo_item_com_mat_entregue": custo_item_com_mat_entregue
         }
 
     totvs_indicators = add_percentage_indicators(data)
@@ -89,9 +122,8 @@ def get_all_totvs_indicators():
 
 def get_indicator_value(select_clause, table_name, where_clause):
     query = text(f"SELECT {select_clause} AS value FROM {table_name} WHERE {where_clause};")
-    result = db.session.execute(query).fetchone()
-
-    return result[0] if result else 0
+    result = db.session.execute(query).scalar()
+    return result if result is not None else 0
 
 
 def add_percentage_indicators(data):
@@ -122,21 +154,23 @@ def save_indicators():
              vl_proj_released, vl_proj_finished, vl_proj_adjusted, 
              vl_proj_pi, vl_proj_mp, vl_all_op, vl_pcp_perc, vl_closed_op, 
              vl_product_perc, vl_all_sc, vl_all_pc, vl_compras_perc, 
-             vl_mat_received, vl_mat_received_perc) 
+             vl_mat_received, vl_mat_received_perc, vl_total_mp_pc_cost, vl_mp_pc_cost, 
+             vl_com_pc_cost, vl_mp_deliver_cost, vl_com_deliver_cost) 
         VALUES
             (:qp, :description, :data_emissao_qp, :prazo_entrega_qp, :status_proj, 
              :baseline, :desconsiderar, :indice_mudanca, 
              :projeto_liberado, :projeto_pronto, :em_ajuste, 
              :quant_pi_proj, :quant_mp_proj, :op_total, :indice_pcp, :op_fechada, 
              :indice_producao, :sc_total, :pc_total, :indice_compra, 
-             :mat_entregue, :indice_recebimento);
+             :mat_entregue, :indice_recebimento, :custo_total_mp_pc, :custo_mp_pc,
+             :custo_item_com_pc, :custo_mp_mat_entregue, :custo_item_com_mat_entregue);
         """)
 
         op_total = int(totvs_indicators[cod_qp]['op_total'])
         quant_pi_proj = int(project_indicators['quant_pi_proj'])
 
         if quant_pi_proj > 0:
-            indice_pcp = ((op_total / quant_pi_proj) * 100) if quant_pi_proj > 0 else 0
+            indice_pcp = round((op_total / quant_pi_proj) * 100, 2) if quant_pi_proj > 0 else 0
         else:
             indice_pcp = 0
 
@@ -162,7 +196,12 @@ def save_indicators():
             'pc_total': int(totvs_indicators[cod_qp]['pc_total']),
             'indice_compra': float(totvs_indicators[cod_qp]['indice_compra']),
             'mat_entregue': int(totvs_indicators[cod_qp]['mat_entregue']),
-            'indice_recebimento': float(totvs_indicators[cod_qp]['indice_recebimento'])
+            'indice_recebimento': float(totvs_indicators[cod_qp]['indice_recebimento']),
+            'custo_total_mp_pc': float(totvs_indicators[cod_qp]['custo_total_mp_pc']),
+            'custo_mp_pc': float(totvs_indicators[cod_qp]['custo_mp_pc']),
+            'custo_item_com_pc': float(totvs_indicators[cod_qp]['custo_item_com_pc']),
+            'custo_mp_mat_entregue': float(totvs_indicators[cod_qp]['custo_mp_mat_entregue']),
+            'custo_item_com_mat_entregue': float(totvs_indicators[cod_qp]['custo_item_com_mat_entregue'])
         })
 
     db.session.commit()
