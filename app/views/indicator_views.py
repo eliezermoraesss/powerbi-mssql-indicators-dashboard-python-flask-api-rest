@@ -1,4 +1,4 @@
-from flask import jsonify, abort
+from flask import jsonify, abort, render_template
 from app import create_app
 from app.controllers.indicator_controller import (
     get_all_indicators,
@@ -8,6 +8,7 @@ from app.controllers.indicator_controller import (
 from apscheduler.schedulers.background import BackgroundScheduler
 import requests
 import logging
+from app.extensions.email_service import send_email
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -16,7 +17,8 @@ app = create_app()
 
 @app.route('/')
 def home():
-    return "API de Indicadores de Dashboard está online!"
+    send_email("Eureka® Systems NOTIFICATION", "API de Indicadores de Dashboard está online!\n\nEureka® BOT")
+    return render_template('index.html')
 
 
 @app.route('/indicators', methods=['GET'])
@@ -25,7 +27,9 @@ def all_indicators():
         response = get_all_indicators()
         return jsonify(response)
     except Exception as e:
-        logging.error(f"Erro ao consultar todos os indicadores: {e}")
+        error_message = f"Erro ao consultar todos os indicadores: {e}"
+        logging.error(error_message)
+        send_email("API Error - /indicators", error_message)
         abort(500, description="Internal Server Error")
 
 
@@ -35,7 +39,9 @@ def all_totvs_indicators():
         response = get_all_totvs_indicators()
         return jsonify(response)
     except Exception as e:
-        logging.error(f"Erro ao consultar os indicadores do TOTVS: {e}")
+        error_message = f"Erro ao consultar os indicadores do TOTVS: {e}"
+        logging.error(error_message)
+        send_email("API Error - /indicators/totvs", error_message)
         abort(500, description="Internal Server Error")
 
 
@@ -44,10 +50,14 @@ def save_all_indicators():
     try:
         logging.info("request: Atualização de todos Indicadores em andamento...")
         save_indicators()
-        logging.info("response: Atualização e salvamento dos Indicadores realizada com sucesso!")
-        return "Atualização e salvamento dos Indicadores realizada com sucesso!", 201
+        success_message = "response: Atualização e salvamento dos Indicadores realizada com sucesso!"
+        logging.info(success_message)
+        send_email("API Success - /indicators/save", success_message)
+        return success_message, 201
     except Exception as e:
-        logging.error(f"Erro ao salvar os indicadores: {e}")
+        error_message = f"Erro ao salvar os indicadores: {e}"
+        logging.error(error_message)
+        send_email("API Error - /indicators/save", error_message)
         abort(500, description="Internal Server Error")
 
 
@@ -55,9 +65,13 @@ def scheduled_task_save_all_indicators():
     try:
         logging.info("scheduled: Atualização de todos Indicadores em andamento...")
         requests.post('http://localhost:5000/indicators/save', timeout=600)  # 600 seconds or 10 minutes
-        logging.info("scheduled: Atualização e salvamento dos Indicadores realizada com sucesso!")
+        success_message = "scheduled: Atualização e salvamento dos Indicadores realizada com sucesso!"
+        logging.info(success_message)
+        send_email("Scheduled Task - Success", success_message)
     except requests.exceptions.ConnectionError as ex:
-        logging.error(f"Erro de conexão: {ex}")
+        error_message = f"Erro de conexão: {ex}"
+        logging.error(error_message)
+        send_email("Scheduled Task - Error", error_message)
 
 
 if __name__ == '__main__':
