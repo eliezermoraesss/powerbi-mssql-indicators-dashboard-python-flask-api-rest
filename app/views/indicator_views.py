@@ -1,3 +1,4 @@
+import pytz
 from flask import jsonify, abort, render_template
 from app import create_app
 from app.controllers.indicator_controller import (
@@ -6,6 +7,7 @@ from app.controllers.indicator_controller import (
     save_indicators
 )
 from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.cron import CronTrigger
 import requests
 import logging
 from app.extensions.email_service import send_email
@@ -75,7 +77,12 @@ def scheduled_task_save_all_indicators():
 
 
 if __name__ == '__main__':
-    scheduler = BackgroundScheduler()
-    scheduler.add_job(scheduled_task_save_all_indicators, 'interval', days=1)
+    timezone = pytz.timezone('America/Sao_Paulo')
+
+    scheduler = BackgroundScheduler(timezone=timezone)
+    scheduler.add_job(scheduled_task_save_all_indicators, CronTrigger(hour=8, minute=0, timezone=timezone))
+    logging.info(f"Job agendado para executar às 11:42 no fuso horário {timezone}")
     scheduler.start()
+    logging.info("Scheduler iniciado")
+
     app.run(host='0.0.0.0', port=5000, use_reloader=False, debug=True)
