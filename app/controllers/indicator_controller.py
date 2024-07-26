@@ -4,6 +4,7 @@ from app.extensions.sharepoint_project_data import get_sharepoint_project_data
 import pandas as pd
 from typing import Dict, Any
 import logging
+from app.extensions.email_service import send_email
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -49,7 +50,9 @@ def get_all_indicators() -> Dict[str, Any]:
                                                         f"enaplic_management.dbo.{indicators_table}",
                                                         f"cod_qp LIKE '%{cod_qp_formatado}' ORDER BY id DESC")
             except Exception as e:
-                logging.error(f"Error retrieving {key} for cod_qp {cod_qp_formatado}: {e}")
+                error_message = f"Error retrieving {key} for cod_qp {cod_qp_formatado}: {e}"
+                logging.error(error_message)
+                send_email("API Error - get_all_indicators", error_message)
                 data[cod_qp][key] = 0  # Default to 0 if there's an error
     return data
 
@@ -95,7 +98,9 @@ def get_all_totvs_indicators() -> Dict[str, Any]:
             data[cod_qp]["custo_total_mp_pc"] = round(data[cod_qp]["custo_mp_pc"] + data[cod_qp]["custo_item_com_pc"],
                                                       2)
         except Exception as e:
-            logging.error(f"Error retrieving TOTVS indicators for cod_qp {cod_qp_formatado}: {e}")
+            error_message = f"Error retrieving TOTVS indicators for cod_qp {cod_qp_formatado}: {e}"
+            logging.error(error_message)
+            send_email("API Error - get_all_totvs_indicators", error_message)
             data[cod_qp] = {key: 0 for key in ["op_total", "op_fechada", "sc_total", "pc_total", "mat_entregue",
                                                "custo_total_mp_pc", "custo_mp_pc", "custo_item_com_pc",
                                                "custo_mp_mat_entregue", "custo_item_com_mat_entregue"]}
@@ -109,7 +114,9 @@ def get_indicator_value(select_clause: str, table_name: str, where_clause: str) 
         result = db.session.execute(query).scalar()
         return result if result is not None else 0
     except Exception as e:
-        logging.error(f"Error executing query: SELECT {select_clause} FROM {table_name} WHERE {where_clause}: {e}")
+        error_message = f"Error executing query: SELECT {select_clause} FROM {table_name} WHERE {where_clause}: {e}"
+        logging.error(error_message)
+        send_email("API Error - get_indicator_value", error_message)
         return 0
 
 
@@ -123,7 +130,9 @@ def add_percentage_indicators(data: Dict[str, Dict[str, Any]]) -> Dict[str, Dict
             values['indice_recebimento'] = round((values['mat_entregue'] / values['pc_total']) * 100, 2) if values[
                                                                                                                 'pc_total'] > 0 else 0
         except Exception as e:
-            logging.error(f"Error calculating percentage indicators for cod_qp {cod_qp}: {e}")
+            error_message = f"Error calculating percentage indicators for cod_qp {cod_qp}: {e}"
+            logging.error(error_message)
+            send_email("API Error - add_percentage_indicators", error_message)
             values['indice_producao'] = 0
             values['indice_compra'] = 0
             values['indice_recebimento'] = 0
@@ -192,79 +201,90 @@ def save_indicators() -> None:
                     'custo_mp_mat_entregue': float(totvs_indicators[cod_qp]['custo_mp_mat_entregue']),
                     'custo_item_com_mat_entregue': float(totvs_indicators[cod_qp]['custo_item_com_mat_entregue'])
                 })
+                db.session.commit()
             except Exception as e:
-                logging.error(f"Error saving indicators for cod_qp {cod_qp}: {e}")
-
-        db.session.commit()
+                db.session.rollback()
+                error_message = f"Error saving indicators for cod_qp {cod_qp}: {e}"
+                logging.error(error_message)
+                send_email("API Error - save_indicators", error_message)
     except Exception as e:
-        logging.error(f"Error in save_indicators: {e}")
+        error_message = f"General error in save_indicators: {e}"
+        logging.error(error_message)
+        send_email("API Error - save_indicators", error_message)
 
 
 def update_open_qps_table(data_proj_indicator: Dict[str, Any]) -> None:
-    try:
-        for cod_qp, qp_indicators in data_proj_indicator.items():
+    for cod_qp, qp_indicators in data_proj_indicator.items():
+        try:
             if not get_open_qps(cod_qp):
-                try:
-                    insert_open_qps_query = text(f"""
-                        INSERT INTO 
-                            enaplic_management.dbo.{open_qps_table} 
-                            (cod_qp, des_qp, dt_open_qp, dt_end_qp)
-                        VALUES(:qp, :description, :data_emissao, :prazo_entrega);
-                        """)
+                insert_open_qps_query = text(f"""
+                            INSERT INTO 
+                                enaplic_management.dbo.{open_qps_table} 
+                                (cod_qp, des_qp, dt_open_qp, dt_end_qp)
+                            VALUES(:qp, :description, :data_emissao, :prazo_entrega);
+                            """)
 
-                    db.session.execute(insert_open_qps_query, {
-                        'qp': cod_qp,
-                        'description': qp_indicators['description'],
-                        'data_emissao': qp_indicators['data_emissao_qp'],
-                        'prazo_entrega': qp_indicators['prazo_entrega_qp']
-                    })
-                    db.session.commit()
-                except Exception as e:
-                    logging.error(f"Error inserting open QP {cod_qp}: {e}")
-    except Exception as e:
-        logging.error(f"Error in update_open_qps_table: {e}")
+                db.session.execute(insert_open_qps_query, {
+                    'qp': cod_qp,
+                    'description': qp_indicators['description'],
+                    'data_emissao': qp_indicators['data_emissao_qp'],
+                    'prazo_entrega': qp_indicators['prazo_entrega_qp']
+                })
+                db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            error_message = f"Error inserting open QP {cod_qp}: {e}"
+            logging.error(error_message)
+            send_email("API Error - update_open_qps_table", error_message)
 
 
 def get_project_data() -> Dict[str, Any]:
-    dataframe = get_sharepoint_project_data()
+    try:
+        dataframe = get_sharepoint_project_data()
 
-    total_rows = len(dataframe)
-    chunk_size = 9
-    dataframe_dict = {}
-    qps_description_dict = {}
+        total_rows = len(dataframe)
+        chunk_size = 9
+        dataframe_dict = {}
+        qps_description_dict = {}
 
-    for i in range(0, total_rows, chunk_size):
-        chunk_df = dataframe.iloc[i:i + chunk_size]
-        cod_qp = [format_qp(cell) for cell in chunk_df["QP_CLIENTE"]]
+        for i in range(0, total_rows, chunk_size):
+            chunk_df = dataframe.iloc[i:i + chunk_size]
+            cod_qp = [format_qp(cell) for cell in chunk_df["QP_CLIENTE"]]
 
-        dataframe_dict[cod_qp[0]] = chunk_df
-        qps_description_dict.update({code: clean_string(cell) for code, cell in zip(cod_qp, chunk_df["QP_CLIENTE"])})
+            dataframe_dict[cod_qp[0]] = chunk_df
+            qps_description_dict.update({code: clean_string(cell) for code, cell in zip(cod_qp, chunk_df["QP_CLIENTE"])})
 
-    data_proj_indicator = {}
-    for qp, description in qps_description_dict.items():
-        df = dataframe_dict[qp]
+        data_proj_indicator = {}
+        for qp, description in qps_description_dict.items():
+            df = dataframe_dict[qp]
 
-        status_proj = map_status_proj(df[df['ITEM'] == 'BASELINE']['STATUS_PROJETO'].values[0])
-        baseline = df[df['ITEM'] == 'BASELINE']['GERAL'].values[0]
-        desconsiderar = df[df['ITEM'] == 'DESCONSIDERAR']['GERAL'].values[0] * -1
-        indice_mudanca = round((desconsiderar / baseline) * 100, 2) if baseline != 0 else 0
+            status_proj = map_status_proj(df[df['ITEM'] == 'BASELINE']['STATUS_PROJETO'].values[0])
+            baseline = df[df['ITEM'] == 'BASELINE']['GERAL'].values[0]
+            desconsiderar = df[df['ITEM'] == 'DESCONSIDERAR']['GERAL'].values[0] * -1
+            indice_mudanca = round((desconsiderar / baseline) * 100, 2) if baseline != 0 else 0
 
-        data_proj_indicator[qp] = {
-            "qp": qp,
-            "description": description,
-            "baseline": baseline,
-            "desconsiderar": desconsiderar,
-            "indice_mudanca": indice_mudanca,
-            "projeto_liberado": df[df['ITEM'] == 'PROJETO']['GERAL'].values[0],
-            "projeto_pronto": df[df['ITEM'] == 'PRONTO']['GERAL'].values[0] * -1,
-            "em_ajuste": df[df['ITEM'] == 'AJUSTE']['GERAL'].values[0] * -1,
-            "data_emissao_qp": format_date(df[df['ITEM'] == 'BASELINE']['DATA_EMISSAO'].values[0]),
-            "prazo_entrega_qp": format_date(df[df['ITEM'] == 'BASELINE']['PRAZO_ENTREGA'].values[0]),
-            "status_proj": status_proj,
-            "quant_mp_proj": df[df['ITEM'] == 'PRONTO']['MP'].values[0] * -1,
-            "quant_pi_proj": df[df['ITEM'] == 'PRONTO']['PI'].values[0] * -1
-        }
-    return data_proj_indicator
+            data_proj_indicator[qp] = {
+                "qp": qp,
+                "description": description,
+                "baseline": baseline,
+                "desconsiderar": desconsiderar,
+                "indice_mudanca": indice_mudanca,
+                "projeto_liberado": df[df['ITEM'] == 'PROJETO']['GERAL'].values[0],
+                "projeto_pronto": df[df['ITEM'] == 'PRONTO']['GERAL'].values[0] * -1,
+                "em_ajuste": df[df['ITEM'] == 'AJUSTE']['GERAL'].values[0] * -1,
+                "data_emissao_qp": format_date(df[df['ITEM'] == 'BASELINE']['DATA_EMISSAO'].values[0]),
+                "prazo_entrega_qp": format_date(df[df['ITEM'] == 'BASELINE']['PRAZO_ENTREGA'].values[0]),
+                "status_proj": status_proj,
+                "quant_mp_proj": df[df['ITEM'] == 'PRONTO']['MP'].values[0] * -1,
+                "quant_pi_proj": df[df['ITEM'] == 'PRONTO']['PI'].values[0] * -1
+            }
+
+        return data_proj_indicator
+    except Exception as e:
+        error_message = f"Error fetching project data on SHAREPOINT: {e}"
+        logging.error(error_message)
+        send_email("API Error - get_project_data - SHAREPOINT", error_message)
+        return {}
 
 
 def fetch_all_open_qps() -> list:
@@ -276,7 +296,9 @@ def fetch_all_open_qps() -> list:
         cod_qps = db.session.execute(query_qps_em_aberto).fetchall()
         return [row[0] for row in cod_qps]
     except Exception as e:
-        logging.error(f"Error fetching open QPs: {e}")
+        error_message = f"Error fetching open QPs: {e}"
+        logging.error(error_message)
+        send_email("API Error - fetch_all_open_qps", error_message)
         return []
 
 
@@ -290,7 +312,9 @@ def get_open_qps(qp: str) -> bool:
         result = db.session.execute(query_open, {'qp': qp}).fetchone()
         return result is not None
     except Exception as e:
-        logging.error(f"Error checking open QPs for {qp}: {e}")
+        error_message = f"Error checking open QPs for {qp}: {e}"
+        logging.error(error_message)
+        send_email("API Error - get_open_qps", error_message)
         return False
 
 
