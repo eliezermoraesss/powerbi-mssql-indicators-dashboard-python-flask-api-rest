@@ -8,8 +8,10 @@ from app.extensions.email_service import send_email
 
 logging.basicConfig(level=logging.DEBUG)
 
-indicators_table = "tb_dashboard_indicators"
 open_qps_table = "tb_open_qps"
+indicators_table = "tb_dashboard_indicators"
+current_indicators_table = "tb_current_dashboard_indicators"
+indicators_table_list = ["tb_dashboard_indicators", "tb_current_dashboard_indicators"]
 
 
 def get_all_indicators() -> Dict[str, Any]:
@@ -139,17 +141,10 @@ def add_percentage_indicators(data: Dict[str, Dict[str, Any]]) -> Dict[str, Dict
     return data
 
 
-def save_indicators() -> None:
-    try:
-        project_data = get_project_data()
-        update_open_qps_table(project_data)
-        totvs_indicators = get_all_totvs_indicators()
-
-        for cod_qp, project_indicators in project_data.items():
-            try:
-                insert_query = text(f"""
+def insert_query(table_name):
+    return text(f"""
                 INSERT INTO 
-                    enaplic_management.dbo.{indicators_table} 
+                    enaplic_management.dbo.{table_name} 
                     (cod_qp, des_qp, dt_open_qp, dt_end_qp, status_proj, 
                      vl_proj_all_prod, vl_proj_prod_cancel, vl_proj_modify_perc, 
                      vl_proj_released, vl_proj_finished, vl_proj_adjusted, 
@@ -167,46 +162,65 @@ def save_indicators() -> None:
                      :custo_item_com_pc, :custo_mp_mat_entregue, :custo_item_com_mat_entregue);
                 """)
 
-                op_total = int(totvs_indicators[cod_qp]['op_total'])
-                quant_pi_proj = int(project_indicators['quant_pi_proj'])
 
-                indice_pcp = round((op_total / quant_pi_proj) * 100, 2) if quant_pi_proj > 0 else 0
+def find_all_indicators():
+    project_data = get_project_data()
+    update_open_qps_table(project_data)
+    totvs_indicators = get_all_totvs_indicators()
 
-                db.session.execute(insert_query, {
-                    'qp': cod_qp,
-                    'description': project_indicators['description'],
-                    'data_emissao_qp': project_indicators['data_emissao_qp'],
-                    'prazo_entrega_qp': project_indicators['prazo_entrega_qp'],
-                    'status_proj': project_indicators['status_proj'],
-                    'baseline': int(project_indicators['baseline']),
-                    'desconsiderar': int(project_indicators['desconsiderar']),
-                    'indice_mudanca': float(project_indicators['indice_mudanca']),
-                    'projeto_liberado': int(project_indicators['projeto_liberado']),
-                    'projeto_pronto': int(project_indicators['projeto_pronto']),
-                    'em_ajuste': int(project_indicators['em_ajuste']),
-                    'quant_pi_proj': int(quant_pi_proj),
-                    'quant_mp_proj': int(project_indicators['quant_mp_proj']),
-                    'op_total': op_total,
-                    'indice_pcp': float(indice_pcp),
-                    'indice_producao': float(totvs_indicators[cod_qp]['indice_producao']),
-                    'op_fechada': int(totvs_indicators[cod_qp]['op_fechada']),
-                    'sc_total': int(totvs_indicators[cod_qp]['sc_total']),
-                    'pc_total': int(totvs_indicators[cod_qp]['pc_total']),
-                    'indice_compra': float(totvs_indicators[cod_qp]['indice_compra']),
-                    'mat_entregue': int(totvs_indicators[cod_qp]['mat_entregue']),
-                    'indice_recebimento': float(totvs_indicators[cod_qp]['indice_recebimento']),
-                    'custo_total_mp_pc': float(totvs_indicators[cod_qp]['custo_total_mp_pc']),
-                    'custo_mp_pc': float(totvs_indicators[cod_qp]['custo_mp_pc']),
-                    'custo_item_com_pc': float(totvs_indicators[cod_qp]['custo_item_com_pc']),
-                    'custo_mp_mat_entregue': float(totvs_indicators[cod_qp]['custo_mp_mat_entregue']),
-                    'custo_item_com_mat_entregue': float(totvs_indicators[cod_qp]['custo_item_com_mat_entregue'])
-                })
-                db.session.commit()
-            except Exception as e:
-                db.session.rollback()
-                error_message = f"Error saving indicators for cod_qp {cod_qp}: {e}"
-                logging.error(error_message)
-                send_email("API Error - save_indicators", error_message)
+    return project_data, totvs_indicators
+
+
+def save_indicators(project_data, totvs_indicators) -> None:
+    try:
+        for table in indicators_table_list:
+            if table == 'tb_current_dashboard_indicators':
+                db.session.execute(text(f"TRUNCATE TABLE enaplic_management.dbo.{table}"))
+
+            for cod_qp, project_indicators in project_data.items():
+                try:
+                    query = insert_query(table)
+
+                    op_total = int(totvs_indicators[cod_qp]['op_total'])
+                    quant_pi_proj = int(project_indicators['quant_pi_proj'])
+
+                    indice_pcp = round((op_total / quant_pi_proj) * 100, 2) if quant_pi_proj > 0 else 0
+
+                    db.session.execute(query, {
+                        'qp': cod_qp,
+                        'description': project_indicators['description'],
+                        'data_emissao_qp': project_indicators['data_emissao_qp'],
+                        'prazo_entrega_qp': project_indicators['prazo_entrega_qp'],
+                        'status_proj': project_indicators['status_proj'],
+                        'baseline': int(project_indicators['baseline']),
+                        'desconsiderar': int(project_indicators['desconsiderar']),
+                        'indice_mudanca': float(project_indicators['indice_mudanca']),
+                        'projeto_liberado': int(project_indicators['projeto_liberado']),
+                        'projeto_pronto': int(project_indicators['projeto_pronto']),
+                        'em_ajuste': int(project_indicators['em_ajuste']),
+                        'quant_pi_proj': int(quant_pi_proj),
+                        'quant_mp_proj': int(project_indicators['quant_mp_proj']),
+                        'op_total': op_total,
+                        'indice_pcp': float(indice_pcp),
+                        'indice_producao': float(totvs_indicators[cod_qp]['indice_producao']),
+                        'op_fechada': int(totvs_indicators[cod_qp]['op_fechada']),
+                        'sc_total': int(totvs_indicators[cod_qp]['sc_total']),
+                        'pc_total': int(totvs_indicators[cod_qp]['pc_total']),
+                        'indice_compra': float(totvs_indicators[cod_qp]['indice_compra']),
+                        'mat_entregue': int(totvs_indicators[cod_qp]['mat_entregue']),
+                        'indice_recebimento': float(totvs_indicators[cod_qp]['indice_recebimento']),
+                        'custo_total_mp_pc': float(totvs_indicators[cod_qp]['custo_total_mp_pc']),
+                        'custo_mp_pc': float(totvs_indicators[cod_qp]['custo_mp_pc']),
+                        'custo_item_com_pc': float(totvs_indicators[cod_qp]['custo_item_com_pc']),
+                        'custo_mp_mat_entregue': float(totvs_indicators[cod_qp]['custo_mp_mat_entregue']),
+                        'custo_item_com_mat_entregue': float(totvs_indicators[cod_qp]['custo_item_com_mat_entregue'])
+                    })
+                    db.session.commit()
+                except Exception as e:
+                    db.session.rollback()
+                    error_message = f"Error saving indicators for cod_qp {cod_qp}: {e}"
+                    logging.error(error_message)
+                    send_email("API Error - save_indicators", error_message)
     except Exception as e:
         error_message = f"General error in save_indicators: {e}"
         logging.error(error_message)
@@ -214,6 +228,7 @@ def save_indicators() -> None:
 
 
 def update_open_qps_table(data_proj_indicator: Dict[str, Any]) -> None:
+    delete_open_qps_table()
     for cod_qp, qp_indicators in data_proj_indicator.items():
         try:
             if not get_open_qps(cod_qp):
@@ -236,6 +251,17 @@ def update_open_qps_table(data_proj_indicator: Dict[str, Any]) -> None:
             error_message = f"Error inserting open QP {cod_qp}: {e}"
             logging.error(error_message)
             send_email("API Error - update_open_qps_table", error_message)
+
+
+def delete_open_qps_table():
+    try:
+        db.session.execute(text(f"TRUNCATE TABLE enaplic_management.dbo.{open_qps_table}"))
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        error_message = f'Error truncating open QPS table: {e}'
+        logging.error(error_message)
+        send_email("API Error - delete_open_qps_table", error_message)
 
 
 def get_project_data() -> Dict[str, Any]:

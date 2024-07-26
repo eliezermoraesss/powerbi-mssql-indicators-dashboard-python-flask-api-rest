@@ -4,7 +4,7 @@ from app import create_app
 from app.controllers.indicator_controller import (
     get_all_indicators,
     get_all_totvs_indicators,
-    save_indicators
+    save_indicators, find_all_indicators
 )
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -51,7 +51,10 @@ def all_totvs_indicators():
 def save_all_indicators():
     try:
         logging.info("request: Atualização de todos Indicadores em andamento...")
-        save_indicators()
+
+        project_data, totvs_indicators = find_all_indicators()
+        save_indicators(project_data, totvs_indicators)
+
         success_message = "response: Atualização e salvamento dos Indicadores realizada com sucesso!"
         logging.info(success_message)
         send_email("API Success - /indicators/save", success_message)
