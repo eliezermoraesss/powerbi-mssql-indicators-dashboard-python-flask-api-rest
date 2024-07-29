@@ -165,13 +165,13 @@ def insert_query(table_name):
                 """)
 
 
-def find_all_sharepoint_indicators(status_qp):
+def find_all_sharepoint_indicators(status_qp: str) -> Dict[str, Any]:
     project_data = get_project_data(file_name[status_qp])
     update_qps_table(project_data, status_qp)
     return project_data
 
 
-def save_indicators(project_data, totvs_indicators) -> None:
+def save_indicators(project_data: Dict[str, Any], totvs_indicators: Dict[str, Any]) -> None:
     try:
         for table in indicators_table_list:
             if table == 'tb_current_dashboard_indicators':
@@ -227,7 +227,7 @@ def save_indicators(project_data, totvs_indicators) -> None:
         send_email("API Error - save_indicators", error_message)
 
 
-def update_qps_table(data_proj_indicator: Dict[str, Any], status_qp) -> None:
+def update_qps_table(data_proj_indicator: Dict[str, Any], status_qp: str) -> None:
     delete_qps_table(status_qp)
     for cod_qp, qp_indicators in data_proj_indicator.items():
         try:
@@ -253,7 +253,7 @@ def update_qps_table(data_proj_indicator: Dict[str, Any], status_qp) -> None:
             send_email("API Error - update_qps_table", error_message)
 
 
-def delete_qps_table(status_qp):
+def delete_qps_table(status_qp: str):
     try:
         db.session.execute(text(f"TRUNCATE TABLE enaplic_management.dbo.{qp_table[status_qp]}"))
         db.session.commit()
@@ -264,9 +264,9 @@ def delete_qps_table(status_qp):
         send_email("API Error - delete_qps_table", error_message)
 
 
-def get_project_data(file_name) -> Dict[str, Any]:
+def get_project_data(excel_file_name) -> Dict[str, Any]:
     try:
-        dataframe = get_sharepoint_project_data(file_name)
+        dataframe = get_sharepoint_project_data(excel_file_name)
 
         total_rows = len(dataframe)
         chunk_size = 9

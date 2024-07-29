@@ -58,17 +58,21 @@ def save_all_indicators():
             logging.info("request: Atualização de todos Indicadores em andamento...")
             project_data = find_all_sharepoint_indicators(status_qp)
             totvs_indicators = get_all_totvs_indicators()
+            save_indicators(project_data, totvs_indicators)
+
+            success_message = "response: Atualização e salvamento dos Indicadores realizada com sucesso!"
+            logging.info(success_message)
+            send_email("API Success - /indicators/save?qp=open", success_message)
+            return success_message, 201
         elif status_qp == 'closed':
-            project_data = find_all_sharepoint_indicators(status_qp)
+            find_all_sharepoint_indicators(status_qp)
+
+            sucess_message = "response: Atualização da tabela de QPs CONCLUÍDAS realizada com sucesso!"
+            logging.info(sucess_message)
+            send_email("API Success - /indicators/save?qp=closed", sucess_message)
+            return sucess_message, 201
         else:
             return abort(400, description="Unknown value for 'qp'")
-
-        save_indicators(project_data, totvs_indicators)
-
-        success_message = "response: Atualização e salvamento dos Indicadores realizada com sucesso!"
-        logging.info(success_message)
-        send_email("API Success - /indicators/save", success_message)
-        return success_message, 201
 
     except Exception as e:
         error_message = f"Erro ao salvar os indicadores: {e}"
