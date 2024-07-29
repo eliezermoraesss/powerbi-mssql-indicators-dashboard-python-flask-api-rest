@@ -5,9 +5,8 @@ import tempfile
 import pythoncom
 
 
-def get_sharepoint_project_data():
+def get_sharepoint_project_data(file_name):
     pythoncom.CoInitialize()
-    file_name = 'PROJ_INDICATORS.xlsm'
 
     # Caminho para o arquivo Excel
     file_path = os.path.join(tempfile.gettempdir(), file_name)

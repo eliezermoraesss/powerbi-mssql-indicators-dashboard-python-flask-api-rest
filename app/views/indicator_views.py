@@ -1,10 +1,10 @@
 import pytz
-from flask import jsonify, abort, render_template
+from flask import jsonify, abort, render_template, request
 from app import create_app
 from app.controllers.indicator_controller import (
     get_all_indicators,
     get_all_totvs_indicators,
-    save_indicators, find_all_indicators
+    save_indicators, find_all_sharepoint_indicators
 )
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -50,15 +50,26 @@ def all_totvs_indicators():
 @app.route('/indicators/save', methods=['GET', 'POST'])
 def save_all_indicators():
     try:
-        logging.info("request: Atualização de todos Indicadores em andamento...")
+        status_qp = request.args.get('qp')
 
-        project_data, totvs_indicators = find_all_indicators()
+        if status_qp is None:
+            return abort(400, description="Parameter 'qp' is required")
+        if status_qp == 'open':
+            logging.info("request: Atualização de todos Indicadores em andamento...")
+            project_data = find_all_sharepoint_indicators(status_qp)
+            totvs_indicators = get_all_totvs_indicators()
+        elif status_qp == 'closed':
+            project_data = find_all_sharepoint_indicators(status_qp)
+        else:
+            return abort(400, description="Unknown value for 'qp'")
+
         save_indicators(project_data, totvs_indicators)
 
         success_message = "response: Atualização e salvamento dos Indicadores realizada com sucesso!"
         logging.info(success_message)
         send_email("API Success - /indicators/save", success_message)
         return success_message, 201
+
     except Exception as e:
         error_message = f"Erro ao salvar os indicadores: {e}"
         logging.error(error_message)

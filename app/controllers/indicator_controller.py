@@ -12,6 +12,8 @@ open_qps_table = "tb_open_qps"
 indicators_table = "tb_dashboard_indicators"
 current_indicators_table = "tb_current_dashboard_indicators"
 indicators_table_list = ["tb_dashboard_indicators", "tb_current_dashboard_indicators"]
+file_name = {"open": "PROJ_INDICATORS.xlsm", "closed": "PROJ_INDICATORS_QP_CONCLUIDO.xlsm"}
+qp_table = {"open": "tb_open_qps", "closed": "tb_end_qps"}
 
 
 def get_all_indicators() -> Dict[str, Any]:
@@ -163,12 +165,10 @@ def insert_query(table_name):
                 """)
 
 
-def find_all_indicators():
-    project_data = get_project_data()
-    update_open_qps_table(project_data)
-    totvs_indicators = get_all_totvs_indicators()
-
-    return project_data, totvs_indicators
+def find_all_sharepoint_indicators(status_qp):
+    project_data = get_project_data(file_name[status_qp])
+    update_qps_table(project_data, status_qp)
+    return project_data
 
 
 def save_indicators(project_data, totvs_indicators) -> None:
@@ -227,14 +227,14 @@ def save_indicators(project_data, totvs_indicators) -> None:
         send_email("API Error - save_indicators", error_message)
 
 
-def update_open_qps_table(data_proj_indicator: Dict[str, Any]) -> None:
-    delete_open_qps_table()
+def update_qps_table(data_proj_indicator: Dict[str, Any], status_qp) -> None:
+    delete_qps_table(status_qp)
     for cod_qp, qp_indicators in data_proj_indicator.items():
         try:
-            if not get_open_qps(cod_qp):
+            if not get_qps(cod_qp, status_qp):
                 insert_open_qps_query = text(f"""
                             INSERT INTO 
-                                enaplic_management.dbo.{open_qps_table} 
+                                enaplic_management.dbo.{qp_table[status_qp]} 
                                 (cod_qp, des_qp, dt_open_qp, dt_end_qp)
                             VALUES(:qp, :description, :data_emissao, :prazo_entrega);
                             """)
@@ -248,25 +248,25 @@ def update_open_qps_table(data_proj_indicator: Dict[str, Any]) -> None:
                 db.session.commit()
         except Exception as e:
             db.session.rollback()
-            error_message = f"Error inserting open QP {cod_qp}: {e}"
+            error_message = f"Error inserting {status_qp} QP {cod_qp}: {e}"
             logging.error(error_message)
-            send_email("API Error - update_open_qps_table", error_message)
+            send_email("API Error - update_qps_table", error_message)
 
 
-def delete_open_qps_table():
+def delete_qps_table(status_qp):
     try:
-        db.session.execute(text(f"TRUNCATE TABLE enaplic_management.dbo.{open_qps_table}"))
+        db.session.execute(text(f"TRUNCATE TABLE enaplic_management.dbo.{qp_table[status_qp]}"))
         db.session.commit()
     except Exception as e:
         db.session.rollback()
-        error_message = f'Error truncating open QPS table: {e}'
+        error_message = f'Error truncating {status_qp} QPS table: {e}'
         logging.error(error_message)
-        send_email("API Error - delete_open_qps_table", error_message)
+        send_email("API Error - delete_qps_table", error_message)
 
 
-def get_project_data() -> Dict[str, Any]:
+def get_project_data(file_name) -> Dict[str, Any]:
     try:
-        dataframe = get_sharepoint_project_data()
+        dataframe = get_sharepoint_project_data(file_name)
 
         total_rows = len(dataframe)
         chunk_size = 9
@@ -328,19 +328,19 @@ def fetch_all_open_qps() -> list:
         return []
 
 
-def get_open_qps(qp: str) -> bool:
+def get_qps(qp: str, status_qp: str) -> bool:
     try:
         query_open = text(f"""
             SELECT 1 
-            FROM enaplic_management.dbo.{open_qps_table}
+            FROM enaplic_management.dbo.{qp_table[status_qp]}
             WHERE cod_qp = :qp
         """)
         result = db.session.execute(query_open, {'qp': qp}).fetchone()
         return result is not None
     except Exception as e:
-        error_message = f"Error checking open QPs for {qp}: {e}"
+        error_message = f"Error checking {status_qp} QPs for {qp}: {e}"
         logging.error(error_message)
-        send_email("API Error - get_open_qps", error_message)
+        send_email("API Error - get_qps", error_message)
         return False
 
 
