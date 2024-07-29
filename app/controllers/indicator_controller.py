@@ -284,7 +284,11 @@ def get_project_data(excel_file_name) -> Dict[str, Any]:
         for qp, description in qps_description_dict.items():
             df = dataframe_dict[qp]
 
-            status_proj = map_status_proj(df[df['ITEM'] == 'BASELINE']['STATUS_PROJETO'].values[0])
+            if excel_file_name == 'PROJ_INDICATORS.xlsm':
+                status_proj = map_status_proj(df[df['ITEM'] == 'BASELINE']['STATUS_PROJETO'].values[0])
+            else:
+                status_proj = map_status_proj('Finalizado')
+
             baseline = df[df['ITEM'] == 'BASELINE']['GERAL'].values[0]
             desconsiderar = df[df['ITEM'] == 'DESCONSIDERAR']['GERAL'].values[0] * -1
             indice_mudanca = round((desconsiderar / baseline) * 100, 2) if baseline != 0 else 0

@@ -65,6 +65,7 @@ def save_all_indicators():
             send_email("API Success - /indicators/save?qp=open", success_message)
             return success_message, 201
         elif status_qp == 'closed':
+            logging.info("request: Atualização da tabela de QPs CONCLUÍDAS em andamento...")
             find_all_sharepoint_indicators(status_qp)
 
             sucess_message = "response: Atualização da tabela de QPs CONCLUÍDAS realizada com sucesso!"
@@ -84,8 +85,21 @@ def save_all_indicators():
 def scheduled_task_save_all_indicators():
     try:
         logging.info("scheduled: Atualização de todos Indicadores em andamento...")
-        requests.post('http://localhost:5000/indicators/save', timeout=600)  # 600 seconds or 10 minutes
+        requests.post('http://localhost:5000/indicators/save?qp=open', timeout=600)  # 600 seconds or 10 minutes
         success_message = "scheduled: Atualização e salvamento dos Indicadores realizada com sucesso!"
+        logging.info(success_message)
+        send_email("Scheduled Task - Success", success_message)
+    except requests.exceptions.ConnectionError as ex:
+        error_message = f"Erro de conexão: {ex}"
+        logging.error(error_message)
+        send_email("Scheduled Task - Error", error_message)
+
+
+def scheduled_task_update_end_qps_table():
+    try:
+        logging.info("scheduled: Atualização da tabela de QPs CONCLUÍDAS em andamento...")
+        requests.post('http://localhost:5000/indicators/save?qp=closed', timeout=1200)  # 1200 seconds or 20 minutes
+        success_message = "scheduled: Atualização da tabela de QPs CONCLUÍDAS realizada com sucesso!"
         logging.info(success_message)
         send_email("Scheduled Task - Success", success_message)
     except requests.exceptions.ConnectionError as ex:
@@ -99,7 +113,8 @@ if __name__ == '__main__':
 
     scheduler = BackgroundScheduler(timezone=timezone)
     scheduler.add_job(scheduled_task_save_all_indicators, CronTrigger(hour=8, minute=0, timezone=timezone))
-    logging.info(f"Job agendado para executar às 11:42 no fuso horário {timezone}")
+    scheduler.add_job(scheduled_task_update_end_qps_table, CronTrigger(hour=17, minute=0, timezone=timezone))
+    logging.info(f"Job agendado para executar no fuso horário {timezone}")
     scheduler.start()
     logging.info("Scheduler iniciado")
 
