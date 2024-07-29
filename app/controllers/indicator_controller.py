@@ -12,8 +12,11 @@ open_qps_table = "tb_open_qps"
 indicators_table = "tb_dashboard_indicators"
 current_indicators_table = "tb_current_dashboard_indicators"
 indicators_table_list = ["tb_dashboard_indicators", "tb_current_dashboard_indicators"]
-file_name = {"open": "PROJ_INDICATORS.xlsm", "closed": "PROJ_INDICATORS_QP_CONCLUIDO.xlsm"}
-qp_table = {"open": "tb_open_qps", "closed": "tb_end_qps"}
+file_name = {
+    "open": "PROJ_INDICATORS.xlsm",
+    "closed": "PROJ_INDICATORS_QP_CONCLUIDO.xlsm",
+    "test": "PROJ_INDICATORS-TEST.xlsm"}
+qp_table = {"open": "tb_open_qps", "closed": "tb_end_qps", "test": "tb_open_qps"}
 
 
 def get_all_indicators() -> Dict[str, Any]:
@@ -21,6 +24,12 @@ def get_all_indicators() -> Dict[str, Any]:
     data = {}
 
     indicators = {
+        "data_emissao_qp": "dt_open_qp",
+        "prazo_entrega_qp": "dt_end_qp",
+        "data_inicio_proj": "dt_start_proj",
+        "data_fim_proj": "dt_end_proj",
+        "duracao_proj": "vl_proj_duration",
+        "status_proj": "status_proj",
         "baseline": "vl_proj_all_prod",
         "desconsiderar": "vl_proj_prod_cancel",
         "indice_mudanca": "vl_proj_modify_perc",
@@ -142,6 +151,28 @@ def add_percentage_indicators(data: Dict[str, Dict[str, Any]]) -> Dict[str, Dict
             values['indice_recebimento'] = 0
     return data
 
+'''def insert_query(table_name):
+    return text(f"""
+                INSERT INTO 
+                    enaplic_management.dbo.{table_name} 
+                    (cod_qp, des_qp, dt_open_qp, dt_end_qp, dt_start_proj,
+                     dt_end_proj, vl_proj_duration, status_proj, 
+                     vl_proj_all_prod, vl_proj_prod_cancel, vl_proj_modify_perc, 
+                     vl_proj_released, vl_proj_finished, vl_proj_adjusted, 
+                     vl_proj_pi, vl_proj_mp, vl_all_op, vl_pcp_perc, vl_closed_op, 
+                     vl_product_perc, vl_all_sc, vl_all_pc, vl_compras_perc, 
+                     vl_mat_received, vl_mat_received_perc, vl_total_mp_pc_cost, vl_mp_pc_cost, 
+                     vl_com_pc_cost, vl_mp_deliver_cost, vl_com_deliver_cost) 
+                VALUES
+                    (:qp, :description, :data_emissao_qp, :prazo_entrega_qp, :data_inicio_proj,
+                     :data_fim_proj, :duracao_proj, :status_proj, 
+                     :baseline, :desconsiderar, :indice_mudanca, 
+                     :projeto_liberado, :projeto_pronto, :em_ajuste, 
+                     :quant_pi_proj, :quant_mp_proj, :op_total, :indice_pcp, :op_fechada, 
+                     :indice_producao, :sc_total, :pc_total, :indice_compra, 
+                     :mat_entregue, :indice_recebimento, :custo_total_mp_pc, :custo_mp_pc,
+                     :custo_item_com_pc, :custo_mp_mat_entregue, :custo_item_com_mat_entregue);
+                """)'''
 
 def insert_query(table_name):
     return text(f"""
@@ -191,6 +222,10 @@ def save_indicators(project_data: Dict[str, Any], totvs_indicators: Dict[str, An
                         'description': project_indicators['description'],
                         'data_emissao_qp': project_indicators['data_emissao_qp'],
                         'prazo_entrega_qp': project_indicators['prazo_entrega_qp'],
+                        # TODO: Uncomment after modified QP EXCEL
+                        # 'data_inicio_proj': project_indicators['data_inicio_proj'],
+                        # 'data_fim_proj': project_indicators['data_fim_proj'],
+                        # 'duracao_proj': int(project_indicators['duracao_proj']),
                         'status_proj': project_indicators['status_proj'],
                         'baseline': int(project_indicators['baseline']),
                         'desconsiderar': int(project_indicators['desconsiderar']),
@@ -278,7 +313,8 @@ def get_project_data(excel_file_name) -> Dict[str, Any]:
             cod_qp = [format_qp(cell) for cell in chunk_df["QP_CLIENTE"]]
 
             dataframe_dict[cod_qp[0]] = chunk_df
-            qps_description_dict.update({code: clean_string(cell) for code, cell in zip(cod_qp, chunk_df["QP_CLIENTE"])})
+            qps_description_dict.update(
+                {code: clean_string(cell) for code, cell in zip(cod_qp, chunk_df["QP_CLIENTE"])})
 
         data_proj_indicator = {}
         for qp, description in qps_description_dict.items():
@@ -304,11 +340,14 @@ def get_project_data(excel_file_name) -> Dict[str, Any]:
                 "em_ajuste": df[df['ITEM'] == 'AJUSTE']['GERAL'].values[0] * -1,
                 "data_emissao_qp": format_date(df[df['ITEM'] == 'BASELINE']['DATA_EMISSAO'].values[0]),
                 "prazo_entrega_qp": format_date(df[df['ITEM'] == 'BASELINE']['PRAZO_ENTREGA'].values[0]),
+                # TODO: Uncomment after modified QP EXCEL
+                # "data_inicio_proj": format_date(df[df['ITEM'] == 'BASELINE']['DATA_INICIO_PROJ'].values[0]),
+                # "data_fim_proj": format_date(df[df['ITEM'] == 'BASELINE']['DATA_FIM_PROJ'].values[0]),
+                # "duracao_proj": df[df['ITEM'] == 'BASELINE']['DURACAO'].values[0],
                 "status_proj": status_proj,
                 "quant_mp_proj": df[df['ITEM'] == 'PRONTO']['MP'].values[0] * -1,
                 "quant_pi_proj": df[df['ITEM'] == 'PRONTO']['PI'].values[0] * -1
             }
-
         return data_proj_indicator
     except Exception as e:
         error_message = f"Error fetching project data on SHAREPOINT: {e}"

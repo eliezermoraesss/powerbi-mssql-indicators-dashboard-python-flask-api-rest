@@ -54,7 +54,7 @@ def save_all_indicators():
 
         if status_qp is None:
             return abort(400, description="Parameter 'qp' is required")
-        if status_qp == 'open':
+        if status_qp == 'open' or status_qp == 'test':
             logging.info("request: Atualização de todos Indicadores em andamento...")
             project_data = find_all_sharepoint_indicators(status_qp)
             totvs_indicators = get_all_totvs_indicators()
@@ -113,7 +113,7 @@ if __name__ == '__main__':
 
     scheduler = BackgroundScheduler(timezone=timezone)
     scheduler.add_job(scheduled_task_save_all_indicators, CronTrigger(hour=8, minute=0, timezone=timezone))
-    scheduler.add_job(scheduled_task_update_end_qps_table, CronTrigger(hour=17, minute=0, timezone=timezone))
+    scheduler.add_job(scheduled_task_update_end_qps_table, 'interval', weeks=1)
     logging.info(f"Job agendado para executar no fuso horário {timezone}")
     scheduler.start()
     logging.info("Scheduler iniciado")
