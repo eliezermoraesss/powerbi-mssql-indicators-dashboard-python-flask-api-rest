@@ -10,4 +10,4 @@ def read_email_params():
     except json.JSONDecodeError:
         logging.error("Estrutura de dados incorreta.")
     except Exception as ex:
-        logging.error(f"Ocorreu um erro ao ler ENV_VAR: {ex}")
+        logging.error(f"Ocorreu um erro ao ler ENV_VAR = EMAIL_APP_PASSWORD_GMAIL: {ex}")
