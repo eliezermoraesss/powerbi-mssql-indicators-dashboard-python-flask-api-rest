@@ -121,4 +121,36 @@ curl http://localhost:5000/indicators/totvs
 }
 
 curl -X POST http://localhost:5000/indicators/save?qp=open
+```
 
+## Fluxo de Trabalho
+
+- **Agendamento**: As tarefas de atualização são agendadas e executadas automaticamente.
+- **Extração**: Dados brutos são extraídos do SharePoint e TOTVS.
+- **Transformação**: Os dados são processados e convertidos em indicadores significativos.
+- **Carregamento**: Os indicadores são armazenados no banco de dados MSSQL.
+- **Visualização**: O dashboard no Power BI se conecta ao banco de dados e apresenta os indicadores de forma intuitiva.
+
+## Configuração e Execução
+
+### Pré-requisitos
+
+Python, Flask, bibliotecas relacionadas (veja requirements.txt), acesso ao SharePoint, banco de dados MSSQL e Power BI.
+
+### Configuração
+
+Ajuste as credenciais de acesso ao SharePoint, conexão com o banco de dados e parâmetros de e-mail nos arquivos de configuração.
+
+### Execução
+
+- Instale as dependências: `pip install -r requirements.txt`
+- Inicie a API: `python app.py`
+- Configure a conexão do Power BI com o banco de dados MSSQL.
+
+## Contribuição
+
+Sinta-se à vontade para contribuir com melhorias, correções ou novas funcionalidades.
+
+## Licença
+
+Este projeto está licenciado sob a licença MIT.
