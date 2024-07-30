@@ -1,10 +1,10 @@
 import logging
 import json
+import os
 
 
 def read_email_params():
-    path = (r"\\192.175.175.4\f\INTEGRANTES\ELIEZER\PROJETO SOLIDWORKS "
-            r"TOTVS\libs-python\user-password-mssql\EMAIL_APP_PASSWORD_GMAIL.txt")
+    path = os.getenv('EMAIL_APP_PASSWORD_GMAIL')
     try:
         with open(path, 'r') as file:
             string = file.read()
