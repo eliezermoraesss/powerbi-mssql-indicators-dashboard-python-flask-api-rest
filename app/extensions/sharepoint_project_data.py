@@ -29,7 +29,7 @@ def get_sharepoint_project_data(file_name):
             workbook = excel_app.Workbooks.Open(file_path)
 
             # Executa a macro
-            excel_app.Application.Run('PROJ_INDICATORS.xlsm!Macro2')
+            excel_app.Application.Run(f'{file_name}!Macro2')
 
             # Espera a macro terminar de executar
             excel_app.CalculateUntilAsyncQueriesDone()

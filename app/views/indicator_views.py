@@ -65,10 +65,10 @@ def save_all_indicators():
             send_email("API Success - /indicators/save?qp=open", success_message)
             return success_message, 201
         elif status_qp == 'closed':
-            logging.info("request: Atualização da tabela de QPs CONCLUÍDAS em andamento...")
+            logging.info("request: Atualização da tabela de QP CONCLUÍDA em andamento...")
             find_all_sharepoint_indicators(status_qp)
 
-            sucess_message = "response: Atualização da tabela de QPs CONCLUÍDAS realizada com sucesso!"
+            sucess_message = "response: Atualização da tabela de QP CONCLUÍDA realizada com sucesso!"
             logging.info(sucess_message)
             send_email("API Success - /indicators/save?qp=closed", sucess_message)
             return sucess_message, 201
@@ -97,9 +97,9 @@ def scheduled_task_save_all_indicators():
 
 def scheduled_task_update_end_qps_table():
     try:
-        logging.info("scheduled: Atualização da tabela de QPs CONCLUÍDAS em andamento...")
+        logging.info("scheduled: Atualização da tabela de QP CONCLUÍDA em andamento...")
         requests.post('http://localhost:5000/indicators/save?qp=closed', timeout=1200)  # 1200 seconds or 20 minutes
-        success_message = "scheduled: Atualização da tabela de QPs CONCLUÍDAS realizada com sucesso!"
+        success_message = "scheduled: Atualização da tabela de QP CONCLUÍDA realizada com sucesso!"
         logging.info(success_message)
         send_email("Scheduled Task - Success", success_message)
     except requests.exceptions.ConnectionError as ex:
@@ -112,7 +112,7 @@ if __name__ == '__main__':
     timezone = pytz.timezone('America/Sao_Paulo')
 
     scheduler = BackgroundScheduler(timezone=timezone)
-    scheduler.add_job(scheduled_task_save_all_indicators, CronTrigger(hour=8, minute=0, timezone=timezone))
+    scheduler.add_job(scheduled_task_save_all_indicators, CronTrigger(hour=7, minute=0, timezone=timezone))
     scheduler.add_job(scheduled_task_update_end_qps_table, 'interval', weeks=1)
     logging.info(f"Job agendado para executar no fuso horário {timezone}")
     scheduler.start()
