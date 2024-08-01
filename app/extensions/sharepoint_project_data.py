@@ -2,15 +2,13 @@ import os
 import win32com.client as win32
 import pandas as pd
 import pythoncom
+import tempfile
 
 
 def get_sharepoint_project_data(file_name):
     pythoncom.CoInitialize()
 
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-
-    # Caminho para o arquivo Excel
-    file_path = os.path.join(script_dir, '..', '..', 'resources', file_name)
+    file_path = os.path.join(tempfile.gettempdir(), file_name)
 
     # Verifica se o arquivo existe
     if not os.path.exists(file_path):
