@@ -20,7 +20,7 @@ app = create_app()
 
 @app.route('/')
 def home():
-    send_email("Eureka® Systems NOTIFICATION", "API de Indicadores de Dashboard está online!\n\nEureka® BOT")
+    send_email("🤖 Eureka® Systems", "API de Indicadores de Dashboard está online! ✔️\n\n🦾 Eureka® BOT")
     return render_template('index.html')
 
 
@@ -29,11 +29,13 @@ def all_indicators():
     try:
         logging.info("request: Consulta de todos os Indicadores em andamento...")
         response = get_all_indicators()
+        send_email("🤖 Eureka® Systems - /indicators", f"Consulta de todos Indicadores realizada com "
+                                                           f"sucesso! ✔️\n\n{response}\n\n🦾 Eureka® BOT")
         return jsonify(response), 200
     except Exception as e:
-        error_message = f"Erro ao consultar todos os indicadores: {e}"
+        error_message = f"Erro ao consultar todos os indicadores: {e}\n\n🦾 Eureka® BOT"
         logging.error(error_message)
-        send_email("API Error - /indicators", error_message)
+        send_email("❌ API Error - /indicators", error_message)
         abort(500, description="Internal Server Error")
 
 
@@ -42,11 +44,13 @@ def all_totvs_indicators():
     try:
         logging.info("request: Consulta dos Indicadores TOTVS em andamento...")
         response = get_all_totvs_indicators()
+        send_email("🤖 Eureka® Systems INFO - /indicators/totvs", f"✔️ Consulta de Indicadores TOTVS realizada com "
+                                                           f"sucesso!\n\n{response}\n\n🦾 Eureka® BOT ")
         return jsonify(response), 200
     except Exception as e:
-        error_message = f"Erro ao consultar os indicadores do TOTVS: {e}"
+        error_message = f"Erro ao consultar os indicadores do TOTVS: {e}\n\n🦾 Eureka® BOT"
         logging.error(error_message)
-        send_email("API Error - /indicators/totvs", error_message)
+        send_email("❌ API Error - /indicators/totvs", error_message)
         abort(500, description="Internal Server Error")
 
 
@@ -63,25 +67,26 @@ def save_all_indicators():
             totvs_indicators = get_all_totvs_indicators()
             save_indicators(project_data, totvs_indicators)
 
-            success_message = "response: Atualização e salvamento dos Indicadores realizada com sucesso!"
+            success_message = (" ✔️ Atualização e salvamento dos Indicadores realizada com sucesso!\n\n🦾 "
+                               "Eureka® BOT")
             logging.info(success_message)
-            send_email("API Success - /indicators/save?qp=open", success_message)
+            send_email("🤖 Eureka® Systems INFO - /indicators/save?qp=open - Success ✔️", success_message)
             return success_message, 201
         elif status_qp == 'closed':
             logging.info("request: Atualização da tabela de QP CONCLUÍDA em andamento...")
             find_all_sharepoint_indicators(status_qp)
 
-            sucess_message = "response: Atualização da tabela de QP CONCLUÍDA realizada com sucesso!"
+            sucess_message = " ✔️ Atualização da tabela de QP CONCLUÍDA realizada com sucesso!\n\n🦾 Eureka® BOT"
             logging.info(sucess_message)
-            send_email("API Success - /indicators/save?qp=closed", sucess_message)
+            send_email("🤖 Eureka® Systems INFO - /indicators/save?qp=closed - Success ✔️", sucess_message)
             return sucess_message, 201
         else:
             return abort(400, description="Unknown value for 'qp'")
 
     except Exception as e:
-        error_message = f"Erro ao salvar os indicadores: {e}"
+        error_message = f"Erro ao salvar os indicadores: {e}\n\n🦾 Eureka® BOT"
         logging.error(error_message)
-        send_email("API Error - /indicators/save", error_message)
+        send_email("❌ API Error - /indicators/save", error_message)
         abort(500, description="Internal Server Error")
 
 
@@ -89,26 +94,26 @@ def scheduled_task_save_all_indicators():
     try:
         logging.info("scheduled: Atualização de todos Indicadores em andamento...")
         requests.post('http://localhost:5000/indicators/save?qp=open', timeout=600)  # 600 seconds or 10 minutes
-        success_message = "scheduled: Atualização e salvamento dos Indicadores realizada com sucesso!"
-        logging.info(success_message)
-        send_email("Scheduled Task - Success", success_message)
+        success_message = " ✔️ Atualização e salvamento dos Indicadores realizados com sucesso!\n\n🦾 Eureka® BOT"
+        logging.info("scheduled: " + success_message)
+        send_email("🤖 Eureka® Systems INFO - Salvar Indicadores - Success ✔️", success_message)
     except requests.exceptions.ConnectionError as ex:
-        error_message = f"Erro de conexão: {ex}"
+        error_message = f"Erro de conexão: {ex}\n\n🦾 Eureka® BOT"
         logging.error(error_message)
-        send_email("Scheduled Task - Error", error_message)
+        send_email("🤖 Eureka® Systems INFO - Salvar Indicadores - Error ❌", error_message)
 
 
 def scheduled_task_update_end_qps_table():
     try:
         logging.info("scheduled: Atualização da tabela de QP CONCLUÍDA em andamento...")
         requests.post('http://localhost:5000/indicators/save?qp=closed', timeout=1200)  # 1200 seconds or 20 minutes
-        success_message = "scheduled: Atualização da tabela de QP CONCLUÍDA realizada com sucesso!"
-        logging.info(success_message)
-        send_email("Scheduled Task - Success", success_message)
+        success_message = " ✔️ Atualização da tabela de QP CONCLUÍDA realizada com sucesso!️\n\n🦾 Eureka® BOT"
+        logging.info("scheduled: " + success_message)
+        send_email("🤖 Eureka® Systems INFO - QP CONCLUÍDA - Success ✔️", success_message)
     except requests.exceptions.ConnectionError as ex:
-        error_message = f"Erro de conexão: {ex}"
+        error_message = f"Erro de conexão: {ex}\n\n🦾 Eureka® BOT"
         logging.error(error_message)
-        send_email("Scheduled Task - Error", error_message)
+        send_email("🤖 Eureka® Systems INFO - QP CONCLUÍDA - Error ❌", error_message)
 
 
 if __name__ == '__main__':
