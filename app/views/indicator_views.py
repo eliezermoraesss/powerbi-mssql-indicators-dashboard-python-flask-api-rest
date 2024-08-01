@@ -11,6 +11,7 @@ from apscheduler.triggers.cron import CronTrigger
 import requests
 import logging
 from app.extensions.email_service import send_email
+from waitress import serve
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -26,8 +27,9 @@ def home():
 @app.route('/indicators', methods=['GET'])
 def all_indicators():
     try:
+        logging.info("request: Consulta de todos os Indicadores em andamento...")
         response = get_all_indicators()
-        return jsonify(response)
+        return jsonify(response), 200
     except Exception as e:
         error_message = f"Erro ao consultar todos os indicadores: {e}"
         logging.error(error_message)
@@ -38,8 +40,9 @@ def all_indicators():
 @app.route('/indicators/totvs', methods=['GET'])
 def all_totvs_indicators():
     try:
+        logging.info("request: Consulta dos Indicadores TOTVS em andamento...")
         response = get_all_totvs_indicators()
-        return jsonify(response)
+        return jsonify(response), 200
     except Exception as e:
         error_message = f"Erro ao consultar os indicadores do TOTVS: {e}"
         logging.error(error_message)
@@ -118,4 +121,4 @@ if __name__ == '__main__':
     scheduler.start()
     logging.info("Scheduler iniciado")
 
-    app.run(host='0.0.0.0', port=5000, use_reloader=False, debug=True)
+    serve(app, host='0.0.0.0', port=5000)
