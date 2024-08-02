@@ -67,7 +67,7 @@ def save_all_indicators():
             totvs_indicators = get_all_totvs_indicators()
             save_indicators(project_data, totvs_indicators)
 
-            success_message = (" ✔️ Atualização e salvamento dos Indicadores realizada com sucesso!\n\n🦾 "
+            success_message = (" ✔️ Atualização dos Indicadores realizada com sucesso!\n\n🦾 "
                                "Eureka® BOT")
             logging.info(success_message)
             send_email("🤖 Eureka® Systems INFO - /indicators/save?qp=open - Success ✔️", success_message)
@@ -94,9 +94,8 @@ def scheduled_task_save_all_indicators():
     try:
         logging.info("scheduled: Atualização de todos Indicadores em andamento...")
         requests.post('http://localhost:5000/indicators/save?qp=open', timeout=600)  # 600 seconds or 10 minutes
-        success_message = " ✔️ Atualização e salvamento dos Indicadores realizados com sucesso!\n\n🦾 Eureka® BOT"
-        logging.info("scheduled: " + success_message)
-        send_email("🤖 Eureka® Systems INFO - Salvar Indicadores - Success ✔️", success_message)
+        success_message = "scheduled: Atualização dos Indicadores realizada com sucesso!"
+        logging.info(success_message)
     except requests.exceptions.ConnectionError as ex:
         error_message = f"Erro de conexão: {ex}\n\n🦾 Eureka® BOT"
         logging.error(error_message)
@@ -107,9 +106,8 @@ def scheduled_task_update_end_qps_table():
     try:
         logging.info("scheduled: Atualização da tabela de QP CONCLUÍDA em andamento...")
         requests.post('http://localhost:5000/indicators/save?qp=closed', timeout=1200)  # 1200 seconds or 20 minutes
-        success_message = " ✔️ Atualização da tabela de QP CONCLUÍDA realizada com sucesso!️\n\n🦾 Eureka® BOT"
-        logging.info("scheduled: " + success_message)
-        send_email("🤖 Eureka® Systems INFO - QP CONCLUÍDA - Success ✔️", success_message)
+        success_message = "scheduled: Atualização da tabela de QP CONCLUÍDA realizada com sucesso!️"
+        logging.info(success_message)
     except requests.exceptions.ConnectionError as ex:
         error_message = f"Erro de conexão: {ex}\n\n🦾 Eureka® BOT"
         logging.error(error_message)
