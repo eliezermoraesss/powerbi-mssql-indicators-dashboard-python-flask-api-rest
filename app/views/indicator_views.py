@@ -1,11 +1,7 @@
 import pytz
 from flask import jsonify, abort, render_template, request
 from app import create_app
-from app.controllers.indicator_controller import (
-    get_all_indicators,
-    get_all_totvs_indicators,
-    save_indicators, find_all_sharepoint_indicators
-)
+from app.controllers.indicator_controller import *
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 import requests
@@ -44,8 +40,8 @@ def all_totvs_indicators():
     try:
         logging.info("request: Consulta dos Indicadores TOTVS em andamento...")
         response = get_all_totvs_indicators()
-        send_email("🤖 Eureka® Systems INFO - /indicators/totvs", f"✔️ Consulta de Indicadores TOTVS realizada com "
-                                                                 f"sucesso!\n\n{response}\n\n🦾 Eureka® BOT ")
+        send_email("🤖 Eureka® Systems INFO - /indicators/totvs", f"Consulta de Indicadores TOTVS realizada com "
+                                                                 f"sucesso! ✔️\n\n{response}\n\n🦾 Eureka® BOT ")
         return jsonify(response), 200
     except Exception as e:
         error_message = f"Erro ao consultar os indicadores do TOTVS: {e}\n\n🦾 Eureka® BOT"
@@ -94,7 +90,7 @@ def save_all_indicators():
 def find_all_end_qps():
     try:
         logging.info("request: Consultando QPS CONCLUÍDAS...")
-        response = get_all_indicators()
+        response = ""
         send_email("🤖 Eureka® Systems - /qp/closed", f"Requisição de QPS CONCLUÍDAS realizada com "
                                                      f"sucesso! ✔️\n\n{response}\n\n🦾 Eureka® BOT")
         return jsonify(response), 200

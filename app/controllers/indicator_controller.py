@@ -20,7 +20,8 @@ qp_table = {"open": "tb_open_qps", "closed": "tb_end_qps", "test": "tb_open_qps"
 
 
 def get_all_indicators() -> Dict[str, Any]:
-    cod_qps = fetch_all_open_qps()
+    result = find_all_qps("open")
+    cod_qps = [row[1] for row in result]
     data = {}
 
     indicators = {
@@ -72,7 +73,9 @@ def get_all_indicators() -> Dict[str, Any]:
 
 
 def get_all_totvs_indicators() -> Dict[str, Any]:
-    cod_qps = fetch_all_open_qps()
+    result = find_all_qps("open")
+    cod_qps = [row[1] for row in result]
+
     data = {}
 
     for cod_qp in cod_qps:
@@ -349,14 +352,14 @@ def get_project_data(excel_file_name) -> Dict[str, Any]:
         return {}
 
 
-def fetch_all_open_qps() -> list:
+def find_all_qps(qp_status) -> list:
     try:
-        query_qps_em_aberto = text(f"""
-            SELECT cod_qp 
-            FROM enaplic_management.dbo.{open_qps_table};
+        query = text(f"""
+            SELECT * 
+            FROM enaplic_management.dbo.{qp_table[qp_status]};
         """)
-        cod_qps = db.session.execute(query_qps_em_aberto).fetchall()
-        return [row[0] for row in cod_qps]
+        result = db.session.execute(query).fetchall()
+        return result
     except Exception as e:
         error_message = f"Error fetching open QPs: {e}"
         logging.error(error_message)
