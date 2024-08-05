@@ -30,7 +30,7 @@ def all_indicators():
         logging.info("request: Consulta de todos os Indicadores em andamento...")
         response = get_all_indicators()
         send_email("🤖 Eureka® Systems - /indicators", f"Consulta de todos Indicadores realizada com "
-                                                           f"sucesso! ✔️\n\n{response}\n\n🦾 Eureka® BOT")
+                                                      f"sucesso! ✔️\n\n{response}\n\n🦾 Eureka® BOT")
         return jsonify(response), 200
     except Exception as e:
         error_message = f"Erro ao consultar todos os indicadores: {e}\n\n🦾 Eureka® BOT"
@@ -45,7 +45,7 @@ def all_totvs_indicators():
         logging.info("request: Consulta dos Indicadores TOTVS em andamento...")
         response = get_all_totvs_indicators()
         send_email("🤖 Eureka® Systems INFO - /indicators/totvs", f"✔️ Consulta de Indicadores TOTVS realizada com "
-                                                           f"sucesso!\n\n{response}\n\n🦾 Eureka® BOT ")
+                                                                 f"sucesso!\n\n{response}\n\n🦾 Eureka® BOT ")
         return jsonify(response), 200
     except Exception as e:
         error_message = f"Erro ao consultar os indicadores do TOTVS: {e}\n\n🦾 Eureka® BOT"
@@ -87,6 +87,21 @@ def save_all_indicators():
         error_message = f"Erro ao salvar os indicadores: {e}\n\n🦾 Eureka® BOT"
         logging.error(error_message)
         send_email("❌ API Error - /indicators/save", error_message)
+        abort(500, description="Internal Server Error")
+
+
+@app.route('/qp/closed', methods=['GET'])
+def find_all_end_qps():
+    try:
+        logging.info("request: Consultando QPS CONCLUÍDAS...")
+        response = get_all_indicators()
+        send_email("🤖 Eureka® Systems - /qp/closed", f"Requisição de QPS CONCLUÍDAS realizada com "
+                                                     f"sucesso! ✔️\n\n{response}\n\n🦾 Eureka® BOT")
+        return jsonify(response), 200
+    except Exception as e:
+        error_message = f"Erro ao consultar QPS CONCLUÍDAS: {e}\n\n🦾 Eureka® BOT"
+        logging.error(error_message)
+        send_email("❌ API Error - /qp/closed", error_message)
         abort(500, description="Internal Server Error")
 
 
