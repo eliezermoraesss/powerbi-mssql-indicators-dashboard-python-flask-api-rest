@@ -1,17 +1,14 @@
 import pytz
 from flask import jsonify, abort, render_template, request
 from app import create_app
-from app.controllers.indicator_controller import (
-    get_all_indicators,
-    get_all_totvs_indicators,
-    save_indicators, find_all_sharepoint_indicators
-)
+from app.controllers.indicator_controller import *
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 import requests
 import logging
 from app.extensions.email_service import send_email
 from waitress import serve
+import json
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -44,8 +41,8 @@ def all_totvs_indicators():
     try:
         logging.info("request: Consulta dos Indicadores TOTVS em andamento...")
         response = get_all_totvs_indicators()
-        send_email("🤖 Eureka® Systems INFO - /indicators/totvs", f"✔️ Consulta de Indicadores TOTVS realizada com "
-                                                                 f"sucesso!\n\n{response}\n\n🦾 Eureka® BOT ")
+        send_email("🤖 Eureka® Systems INFO - /indicators/totvs", f"Consulta de Indicadores TOTVS realizada com "
+                                                                 f"sucesso! ✔️\n\n{response}\n\n🦾 Eureka® BOT ")
         return jsonify(response), 200
     except Exception as e:
         error_message = f"Erro ao consultar os indicadores do TOTVS: {e}\n\n🦾 Eureka® BOT"
@@ -94,10 +91,10 @@ def save_all_indicators():
 def find_all_end_qps():
     try:
         logging.info("request: Consultando QPS CONCLUÍDAS...")
-        response = get_all_indicators()
+        response = find_all_qps("closed")
         send_email("🤖 Eureka® Systems - /qp/closed", f"Requisição de QPS CONCLUÍDAS realizada com "
                                                      f"sucesso! ✔️\n\n{response}\n\n🦾 Eureka® BOT")
-        return jsonify(response), 200
+        return "Requisição de QPS CONCLUÍDAS realizada com sucesso! ✔️", 200
     except Exception as e:
         error_message = f"Erro ao consultar QPS CONCLUÍDAS: {e}\n\n🦾 Eureka® BOT"
         logging.error(error_message)
@@ -133,8 +130,8 @@ if __name__ == '__main__':
     timezone = pytz.timezone('America/Sao_Paulo')
 
     scheduler = BackgroundScheduler(timezone=timezone)
-    scheduler.add_job(scheduled_task_save_all_indicators, CronTrigger(hour=7, minute=0, timezone=timezone))
-    scheduler.add_job(scheduled_task_update_end_qps_table, 'interval', weeks=1)
+    scheduler.add_job(scheduled_task_save_all_indicators, CronTrigger(hour=7, minute=30, timezone=timezone))
+    scheduler.add_job(scheduled_task_update_end_qps_table, CronTrigger(hour=8, minute=30, timezone=timezone))
     logging.info(f"Job agendado para executar no fuso horário {timezone}")
     scheduler.start()
     logging.info("Scheduler iniciado")
