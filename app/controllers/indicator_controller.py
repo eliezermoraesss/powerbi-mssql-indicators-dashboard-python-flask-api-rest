@@ -285,12 +285,11 @@ def update_qps_table(data_proj_indicator: Dict[str, Any], status_qp: str) -> Non
                     intervalo_de_dias = 0
                     status_entrega = 'SEM REFERÊNCIA DE ENTREGA'
                 else:
-                    prazo_de_entrega = pd.to_datetime(prazo_de_entrega, dayfirst=True)
-                    intervalo_de_dias = (prazo_de_entrega - datetime.now()).days
+                    intervalo_de_dias = (pd.to_datetime(prazo_de_entrega, dayfirst=True) - datetime.now()).days
                     if intervalo_de_dias >= 0:
                         status_entrega = 'NO PRAZO'
                     else:
-                        status_entrega = 'ENTREGA ATRASADA'
+                        status_entrega = 'ATRASADO'
                 if not get_qps(cod_qp, status_qp):
                     insert = text(f"""
                                 INSERT INTO 
@@ -309,13 +308,25 @@ def update_qps_table(data_proj_indicator: Dict[str, Any], status_qp: str) -> Non
                     })
                     db.session.commit()
                 else:
+                    data_de_entrega = get_data_conclusao(cod_qp, status_qp)
+                    if data_de_entrega is not None:
+                        intervalo_de_dias_com_data_entrega = (pd.to_datetime(data_de_entrega, dayfirst=True) - pd.to_datetime(prazo_de_entrega, dayfirst=True)).days
+                        if not pd.isnull(intervalo_de_dias_com_data_entrega):
+                            if intervalo_de_dias_com_data_entrega >= 0:
+                                status_entrega = 'ENTREGUE EM ATRASO'
+                            else:
+                                status_entrega = 'ENTREGUE NO PRAZO'
+                            intervalo_de_dias = intervalo_de_dias_com_data_entrega
+                    else:
+                        data_de_entrega = ''
                     update = text(f"""
                                 UPDATE 
                                     enaplic_management.dbo.{qp_table[status_qp]} 
                                 SET
                                     des_qp = :description, 
-                                    dt_open_qp = :data_emissao, 
-                                    dt_end_qp = :prazo_entrega, 
+                                    dt_open_qp = :data_emissao,
+                                    dt_end_qp = :prazo_entrega,
+                                    dt_completed_qp = :data_de_entrega,
                                     vl_delay = :intervalo_de_dias, 
                                     status_delivery = :status_entrega
                                 WHERE
@@ -326,6 +337,7 @@ def update_qps_table(data_proj_indicator: Dict[str, Any], status_qp: str) -> Non
                         'description': qp_indicators['description'],
                         'data_emissao': qp_indicators['data_emissao_qp'],
                         'prazo_entrega': prazo_de_entrega,
+                        'data_de_entrega': data_de_entrega,
                         'intervalo_de_dias': intervalo_de_dias,
                         'status_entrega': status_entrega
                     })

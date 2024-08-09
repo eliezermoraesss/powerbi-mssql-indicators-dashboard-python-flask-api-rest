@@ -131,7 +131,7 @@ if __name__ == '__main__':
 
     scheduler = BackgroundScheduler(timezone=timezone)
     scheduler.add_job(scheduled_task_save_all_indicators, CronTrigger(hour=7, minute=30, timezone=timezone))
-    scheduler.add_job(scheduled_task_update_end_qps_table, CronTrigger(hour=8, minute=30, timezone=timezone))
+    scheduler.add_job(scheduled_task_update_end_qps_table, CronTrigger(hour=7, minute=00, timezone=timezone))
     logging.info(f"Job agendado para executar no fuso horário {timezone}")
     scheduler.start()
     logging.info("Scheduler iniciado")
