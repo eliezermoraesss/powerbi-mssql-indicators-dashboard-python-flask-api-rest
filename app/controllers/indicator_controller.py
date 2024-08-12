@@ -141,9 +141,12 @@ def get_indicator_value(select_clause: str, table_name: str, where_clause: str) 
 def add_percentage_indicators(data: Dict[str, Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
     for cod_qp, values in data.items():
         try:
-            values['indice_producao'] = round((values['op_fechada'] / values['op_total']) * 100, 2) if values['op_total'] > 0 else 0
-            values['indice_compra'] = round((values['pc_total'] / values['sc_total']) * 100, 2) if values['sc_total'] > 0 else 0
-            values['indice_recebimento'] = round((values['mat_entregue'] / values['pc_total']) * 100, 2) if values['pc_total'] > 0 else 0
+            values['indice_producao'] = round((values['op_fechada'] / values['op_total']) * 100, 2) if values[
+                                                                                                           'op_total'] > 0 else 0
+            values['indice_compra'] = round((values['pc_total'] / values['sc_total']) * 100, 2) if values[
+                                                                                                       'sc_total'] > 0 else 0
+            values['indice_recebimento'] = round((values['mat_entregue'] / values['pc_total']) * 100, 2) if values[
+                                                                                                                'pc_total'] > 0 else 0
         except Exception as e:
             error_message = f"Error calculating percentage indicators for cod_qp {cod_qp}: {e}"
             logging.error(error_message)
@@ -180,7 +183,7 @@ def insert_query(table_name):
 
 def find_all_sharepoint_indicators(status_qp: str) -> Dict[str, Any]:
     project_data = get_project_data(file_name[status_qp])
-    update_qps_table(project_data, status_qp)
+    update_all_qps_table(project_data, status_qp)
     return project_data
 
 
@@ -259,6 +262,125 @@ def get_data_conclusao(qp_number, status_qp):
         return None
 
 
+def get_all_data_conclusao(qp_number):
+    try:
+        query = text(f"""
+            SELECT dt_completed_qp
+            FROM enaplic_management.dbo.tb_qps
+            WHERE cod_qp = :qp
+        """)
+        result = db.session.execute(query, {'qp': qp_number}).fetchone()
+        return result[0] if result else None
+    except Exception as e:
+        error_message = f"Error to get_all_data_conclusao() tb_qps QPs for {qp_number}: {e}"
+        logging.error(error_message)
+        send_email("API Error - get_all_data_conclusao()", error_message)
+        return None
+
+
+def update_all_qps_table(data_proj_indicator: Dict[str, Any], status_qp: str) -> None:
+    for cod_qp, qp_indicators in data_proj_indicator.items():
+        try:
+            prazo_de_entrega = qp_indicators['prazo_entrega_qp']
+            if pd.isnull(prazo_de_entrega) or prazo_de_entrega == '':
+                prazo_de_entrega = ''
+                intervalo_de_dias = 0
+                status_entrega = 'SEM REFERÊNCIA DE ENTREGA'
+            else:
+                intervalo_de_dias = (pd.to_datetime(prazo_de_entrega, dayfirst=True) - datetime.now()).days
+                if intervalo_de_dias >= 0:
+                    status_entrega = 'NO PRAZO'
+                else:
+                    status_entrega = 'ATRASADO'
+            query_params = {
+                'qp': cod_qp,
+                'description': qp_indicators['description'],
+                'data_emissao': qp_indicators['data_emissao_qp'],
+                'prazo_entrega': prazo_de_entrega,
+                'intervalo_de_dias': intervalo_de_dias,
+                'status_entrega': status_entrega
+            }
+            if not get_all_qps(cod_qp) and status_qp == 'open':
+                insert_params = query_params.copy()
+                insert_params['status_qp'] = 'A'
+                insert_open_qps_query = text(f"""
+                            INSERT INTO 
+                                enaplic_management.dbo.tb_qps 
+                                (cod_qp, des_qp, status_qp, dt_open_qp, dt_end_qp, vl_delay, status_delivery)
+                            VALUES
+                                (:qp, :description, :status_qp, :data_emissao, :prazo_entrega, :intervalo_de_dias, :status_entrega);
+                            """)
+                db.session.execute(insert_open_qps_query, insert_params)
+                db.session.commit()
+            elif get_all_qps(cod_qp) and status_qp == 'open':
+                update_open_qps_query = text(f"""
+                    UPDATE 
+                        enaplic_management.dbo.tb_qps 
+                    SET
+                        des_qp = :description, 
+                        dt_open_qp = :data_emissao,
+                        dt_end_qp = :prazo_entrega,
+                        vl_delay = :intervalo_de_dias,
+                        status_delivery = :status_entrega
+                    WHERE
+                        cod_qp = :qp;
+                """)
+                db.session.execute(update_open_qps_query, query_params)
+                db.session.commit()
+            if status_qp == 'closed':
+                insert_params = query_params.copy()
+                insert_params['status_qp'] = 'F'
+                if not get_all_qps(cod_qp):
+                    insert = text(f"""
+                                INSERT INTO 
+                                    enaplic_management.dbo.tb_qps 
+                                    (cod_qp, des_qp, status_qp, dt_open_qp, dt_end_qp, vl_delay, status_delivery)
+                                VALUES
+                                    (:qp, :description, :status_qp, :data_emissao, :prazo_entrega, :intervalo_de_dias, :status_entrega);
+                                """)
+                    db.session.execute(insert, insert_params)
+                    db.session.commit()
+                else:
+                    update_params = query_params.copy()
+                    data_de_entrega = get_all_data_conclusao(cod_qp)
+                    if data_de_entrega is not None:
+                        intervalo_de_dias_com_data_entrega = (
+                                pd.to_datetime(data_de_entrega, dayfirst=True) - pd.to_datetime(prazo_de_entrega,
+                                                                                                dayfirst=True)).days
+                        if not pd.isnull(intervalo_de_dias_com_data_entrega):
+                            if intervalo_de_dias_com_data_entrega > 0:
+                                update_params['status_entrega'] = 'ENTREGUE EM ATRASO'
+                            else:
+                                update_params['status_entrega'] = 'ENTREGUE NO PRAZO'
+                            intervalo_de_dias = intervalo_de_dias_com_data_entrega
+                    else:
+                        data_de_entrega = ''
+
+                    update_params['intervalo_de_dias'] = intervalo_de_dias
+                    update_params['data_de_entrega'] = data_de_entrega
+
+                    update = text(f"""
+                                UPDATE 
+                                    enaplic_management.dbo.tb_qps 
+                                SET
+                                    des_qp = :description, 
+                                    dt_open_qp = :data_emissao,
+                                    dt_end_qp = :prazo_entrega,
+                                    dt_completed_qp = :data_de_entrega,
+                                    vl_delay = :intervalo_de_dias, 
+                                    status_delivery = :status_entrega
+                                WHERE
+                                    cod_qp = :qp;
+                                """)
+                    db.session.execute(update, update_params)
+                    db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            error_message = f"Error inserting {status_qp} QP {cod_qp}: {e}"
+            logging.error(error_message)
+            send_email("API Error - update_all_qps_table", error_message)
+
+
 def update_qps_table(data_proj_indicator: Dict[str, Any], status_qp: str) -> None:
     for cod_qp, qp_indicators in data_proj_indicator.items():
         try:
@@ -310,7 +432,9 @@ def update_qps_table(data_proj_indicator: Dict[str, Any], status_qp: str) -> Non
                 else:
                     data_de_entrega = get_data_conclusao(cod_qp, status_qp)
                     if data_de_entrega is not None:
-                        intervalo_de_dias_com_data_entrega = (pd.to_datetime(data_de_entrega, dayfirst=True) - pd.to_datetime(prazo_de_entrega, dayfirst=True)).days
+                        intervalo_de_dias_com_data_entrega = (
+                                pd.to_datetime(data_de_entrega, dayfirst=True) - pd.to_datetime(prazo_de_entrega,
+                                                                                                dayfirst=True)).days
                         if not pd.isnull(intervalo_de_dias_com_data_entrega):
                             if intervalo_de_dias_com_data_entrega >= 0:
                                 status_entrega = 'ENTREGUE EM ATRASO'
@@ -390,7 +514,8 @@ def get_project_data(excel_file_name) -> Dict[str, Any]:
                     duracao_proj = df[df['ITEM'] == 'BASELINE']['DURACAO'].values[0]  # REMOVER
                     duracao_proj = 0 if pd.isna(duracao_proj) else duracao_proj  # REMOVER
 
-                    data_inicio_proj = format_date(df[df['ITEM'] == 'BASELINE']['DATA_INICIO_PROJ'].values[0])  # REMOVER
+                    data_inicio_proj = format_date(
+                        df[df['ITEM'] == 'BASELINE']['DATA_INICIO_PROJ'].values[0])  # REMOVER
                     data_fim_proj = format_date(df[df['ITEM'] == 'BASELINE']['DATA_FIM_PROJ'].values[0])  # REMOVER
                     data_inicio_proj = '' if data_inicio_proj == '00/01/1900' else data_inicio_proj  # REMOVER
                     data_fim_proj = '' if data_fim_proj == '00/01/1900' else data_fim_proj  # REMOVER
@@ -448,15 +573,31 @@ def find_all_qps(qp_status) -> list:
 
 def get_qps(qp: str, status_qp: str) -> bool:
     try:
-        query_open = text(f"""
+        query = text(f"""
             SELECT 1 
             FROM enaplic_management.dbo.{qp_table[status_qp]}
             WHERE cod_qp = :qp
         """)
-        result = db.session.execute(query_open, {'qp': qp}).fetchone()
+        result = db.session.execute(query, {'qp': qp}).fetchone()
         return result is not None
     except Exception as e:
         error_message = f"Error checking {status_qp} QPs for {qp}: {e}"
+        logging.error(error_message)
+        send_email("API Error - get_qps", error_message)
+        return False
+
+
+def get_all_qps(qp: str) -> bool:
+    try:
+        query = text(f"""
+            SELECT 1 
+            FROM enaplic_management.dbo.tb_qps
+            WHERE cod_qp = :qp
+        """)
+        result = db.session.execute(query, {'qp': qp}).fetchone()
+        return result is not None
+    except Exception as e:
+        error_message = f"Error checking tb_qps QPs for {qp}: {e}"
         logging.error(error_message)
         send_email("API Error - get_qps", error_message)
         return False
