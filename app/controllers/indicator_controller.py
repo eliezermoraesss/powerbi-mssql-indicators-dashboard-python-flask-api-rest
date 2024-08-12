@@ -289,7 +289,7 @@ def update_all_qps_table(data_proj_indicator: Dict[str, Any], status_qp: str) ->
             else:
                 intervalo_de_dias = (pd.to_datetime(prazo_de_entrega, dayfirst=True) - datetime.now()).days
                 if intervalo_de_dias >= 0:
-                    status_entrega = 'NO PRAZO'
+                    status_entrega = 'EM DIA'
                 else:
                     status_entrega = 'ATRASADO'
             query_params = {
@@ -345,13 +345,13 @@ def update_all_qps_table(data_proj_indicator: Dict[str, Any], status_qp: str) ->
                     data_de_entrega = get_all_data_conclusao(cod_qp)
                     if data_de_entrega is not None:
                         intervalo_de_dias_com_data_entrega = (
-                                pd.to_datetime(data_de_entrega, dayfirst=True) - pd.to_datetime(prazo_de_entrega,
+                                pd.to_datetime(prazo_de_entrega, dayfirst=True) - pd.to_datetime(data_de_entrega,
                                                                                                 dayfirst=True)).days
                         if not pd.isnull(intervalo_de_dias_com_data_entrega):
-                            if intervalo_de_dias_com_data_entrega > 0:
-                                update_params['status_entrega'] = 'ENTREGUE EM ATRASO'
-                            else:
+                            if intervalo_de_dias_com_data_entrega >= 0:
                                 update_params['status_entrega'] = 'ENTREGUE NO PRAZO'
+                            else:
+                                update_params['status_entrega'] = 'ENTREGUE EM ATRASO'
                             intervalo_de_dias = intervalo_de_dias_com_data_entrega
                     else:
                         data_de_entrega = ''
