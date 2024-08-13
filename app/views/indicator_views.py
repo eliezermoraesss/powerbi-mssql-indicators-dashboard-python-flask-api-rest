@@ -8,7 +8,6 @@ import requests
 import logging
 from app.extensions.email_service import send_email
 from waitress import serve
-import json
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -17,7 +16,7 @@ app = create_app()
 
 @app.route('/')
 def home():
-    send_email("🤖 Eureka® Systems", "API de Indicadores de Dashboard está online! ✔️\n\n🦾 Eureka® BOT")
+    send_email("🤖 Eureka® Systems", "✔️ API de Indicadores de Dashboard está online!\n\n🦾 Eureka® BOT")
     return render_template('index.html')
 
 
@@ -26,8 +25,8 @@ def all_indicators():
     try:
         logging.info("request: Consulta de todos os Indicadores em andamento...")
         response = get_all_indicators()
-        send_email("🤖 Eureka® Systems - /indicators", f"Consulta de todos Indicadores realizada com "
-                                                      f"sucesso! ✔️\n\n{response}\n\n🦾 Eureka® BOT")
+        send_email("🤖 Eureka® Systems - /indicators", f"✔️ Consulta de todos Indicadores realizada com "
+                                                      f"sucesso!\n\n{response}\n\n🦾 Eureka® BOT")
         return jsonify(response), 200
     except Exception as e:
         error_message = f"Erro ao consultar todos os indicadores: {e}\n\n🦾 Eureka® BOT"
@@ -41,8 +40,8 @@ def all_totvs_indicators():
     try:
         logging.info("request: Consulta dos Indicadores TOTVS em andamento...")
         response = get_all_totvs_indicators()
-        send_email("🤖 Eureka® Systems INFO - /indicators/totvs", f"Consulta de Indicadores TOTVS realizada com "
-                                                                 f"sucesso! ✔️\n\n{response}\n\n🦾 Eureka® BOT ")
+        send_email("🤖 Eureka® Systems INFO - /indicators/totvs", f"✔️ Consulta de Indicadores TOTVS realizada com "
+                                                                 f"sucesso!\n\n{response}\n\n🦾 Eureka® BOT ")
         return jsonify(response), 200
     except Exception as e:
         error_message = f"Erro ao consultar os indicadores do TOTVS: {e}\n\n🦾 Eureka® BOT"
@@ -92,9 +91,9 @@ def find_all_end_qps():
     try:
         logging.info("request: Consultando QPS CONCLUÍDAS...")
         response = find_all_qps("closed")
-        send_email("🤖 Eureka® Systems - /qp/closed", f"Requisição de QPS CONCLUÍDAS realizada com "
-                                                     f"sucesso! ✔️\n\n{response}\n\n🦾 Eureka® BOT")
-        return "Requisição de QPS CONCLUÍDAS realizada com sucesso! ✔️", 200
+        send_email("🤖 Eureka® Systems - /qp/closed", f"✔️ Requisição de QPS CONCLUÍDAS realizada com "
+                                                     f"sucesso!\n\n{response}\n\n🦾 Eureka® BOT")
+        return "✔️ Requisição de QPS CONCLUÍDAS realizada com sucesso!", 200
     except Exception as e:
         error_message = f"Erro ao consultar QPS CONCLUÍDAS: {e}\n\n🦾 Eureka® BOT"
         logging.error(error_message)
@@ -134,6 +133,6 @@ if __name__ == '__main__':
     scheduler.add_job(scheduled_task_update_end_qps_table, CronTrigger(hour=7, minute=00, timezone=timezone))
     logging.info(f"Job agendado para executar no fuso horário {timezone}")
     scheduler.start()
-    logging.info("Scheduler iniciado")
+    logging.info("Scheduler iniciado!")
 
     serve(app, host='0.0.0.0', port=5000)
