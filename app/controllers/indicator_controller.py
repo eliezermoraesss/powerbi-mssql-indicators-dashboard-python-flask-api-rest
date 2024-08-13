@@ -443,7 +443,7 @@ def find_all_qps(qp_status) -> list:
             FROM 
                 enaplic_management.dbo.tb_qps
             WHERE
-                status_qp = {status[qp_status]};
+                status_qp = '{status[qp_status]}';
         """)
         result = db.session.execute(query).fetchall()
         return result
