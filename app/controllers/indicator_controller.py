@@ -7,7 +7,7 @@ from typing import Dict, Any
 import logging
 from app.extensions.email_service import send_email
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 
 indicators_table = "tb_dashboard_indicators"
 indicators_table_list = ["tb_dashboard_indicators", "tb_current_dashboard_indicators"]
@@ -15,10 +15,11 @@ file_name = {
     "open": "PROJ_INDICATORS.xlsm",
     "closed": "PROJ_INDICATORS_QP_CONCLUIDO.xlsm",
     "test": "PROJ_INDICATORS-TEST.xlsm"}
+status = {"open": 'A', "closed": 'F'}
 
 
 def get_all_indicators() -> Dict[str, Any]:
-    result = find_all_qps("open")
+    result = find_qp_by_status_qp("open")
     cod_qps = [row[1] for row in result]
     data = {}
 
@@ -71,7 +72,7 @@ def get_all_indicators() -> Dict[str, Any]:
 
 
 def get_all_totvs_indicators() -> Dict[str, Any]:
-    result = find_all_qps("open")
+    result = find_qp_by_status_qp("open")
     cod_qps = [row[1] for row in result]
 
     data = {}
@@ -260,6 +261,7 @@ def get_all_data_conclusao(qp_number):
 
 
 def update_all_qps_table(data_proj_indicator: Dict[str, Any], status_qp: str) -> None:
+    delete_qp_by_status(status_qp, data_proj_indicator)
     for cod_qp, qp_indicators in data_proj_indicator.items():
         try:
             prazo_de_entrega = qp_indicators['prazo_entrega_qp']
@@ -281,7 +283,7 @@ def update_all_qps_table(data_proj_indicator: Dict[str, Any], status_qp: str) ->
                 'intervalo_de_dias': intervalo_de_dias,
                 'status_entrega': status_entrega
             }
-            if not get_all_qps(cod_qp) and status_qp == 'open':
+            if not find_qp_by_cod_qp(cod_qp, status_qp) and status_qp == 'open':
                 insert_params = query_params.copy()
                 insert_params['status_qp'] = 'A'
                 insert_open_qps_query = text(f"""
@@ -293,7 +295,7 @@ def update_all_qps_table(data_proj_indicator: Dict[str, Any], status_qp: str) ->
                             """)
                 db.session.execute(insert_open_qps_query, insert_params)
                 db.session.commit()
-            elif get_all_qps(cod_qp) and status_qp == 'open':
+            elif find_qp_by_cod_qp(cod_qp, status_qp) and status_qp == 'open':
                 update_open_qps_query = text(f"""
                     UPDATE 
                         enaplic_management.dbo.tb_qps 
@@ -311,7 +313,7 @@ def update_all_qps_table(data_proj_indicator: Dict[str, Any], status_qp: str) ->
             if status_qp == 'closed':
                 insert_params = query_params.copy()
                 insert_params['status_qp'] = 'F'
-                if not get_all_qps(cod_qp):
+                if not find_qp_by_cod_qp(cod_qp, status_qp):
                     insert = text(f"""
                                 INSERT INTO 
                                     enaplic_management.dbo.tb_qps 
@@ -434,8 +436,7 @@ def get_project_data(excel_file_name) -> Dict[str, Any]:
         return {}
 
 
-def find_all_qps(qp_status) -> list:
-    status = {"open": 'A', "closed": 'F'}
+def find_qp_by_status_qp(qp_status) -> list:
     try:
         query = text(f"""
             SELECT 
@@ -448,26 +449,80 @@ def find_all_qps(qp_status) -> list:
         result = db.session.execute(query).fetchall()
         return result
     except Exception as e:
-        error_message = f"Error fetching open QPs: {e}"
+        error_message = f"Error fetching QPs: {e}"
         logging.error(error_message)
-        send_email("API Error - fetch_all_open_qps", error_message)
+        send_email("API Error - find_qp_by_status_qp()", error_message)
         return []
 
 
-def get_all_qps(qp: str) -> bool:
+def find_qp_by_cod_qp(qp: str, status_qp: str) -> bool:
     try:
         query = text(f"""
             SELECT 1 
             FROM enaplic_management.dbo.tb_qps
-            WHERE cod_qp = :qp
+            WHERE cod_qp = :qp 
+            AND status_qp = :status_qp
         """)
-        result = db.session.execute(query, {'qp': qp}).fetchone()
+        result = db.session.execute(query, {'qp': qp, 'status_qp': status[status_qp]}).fetchone()
         return result is not None
     except Exception as e:
         error_message = f"Error checking tb_qps QPs for {qp}: {e}"
         logging.error(error_message)
-        send_email("API Error - get_qps", error_message)
+        send_email("API Error - find_qp_by_cod_qp()", error_message)
         return False
+
+
+def find_all_qp():
+    try:
+        query = text("SELECT * FROM enaplic_management.dbo.tb_qps")
+        return db.session.execute(query).fetchall()
+    except Exception as ex:
+        error_message = f"Error to find all QPs: {ex}"
+        logging.error(error_message)
+        send_email("API Error - find_all_qp()", error_message)
+
+
+def send_all_notifications_emails():
+    try:
+        rows = find_all_qp()
+        if rows:
+            dataframe = pd.DataFrame(rows)
+        else:
+            raise Exception("Não foi encontrada nenhuma QP durante a consulta.")
+        return True, "✔️ Serviço de notificação por e-mail executado com sucesso!"
+    except Exception as ex:
+        return False, ex
+
+
+def delete_qp_by_status(status_qp: str, data_sharepoint_qp_files: Dict[str, Any]):
+    qps_table = find_qp_by_status_qp(status_qp)
+
+    cod_qps_database = [row[1] for row in qps_table]
+    cod_qps_sharepoint = data_sharepoint_qp_files.keys()
+
+    cod_qps_to_be_removed = []
+
+    for cod_qp in cod_qps_database:
+        if cod_qp not in cod_qps_sharepoint:
+            cod_qps_to_be_removed.append(cod_qp)
+
+    for cod_qp in cod_qps_sharepoint:
+        if cod_qp not in cod_qps_database:
+            cod_qps_to_be_removed.append(cod_qp)
+
+    for qp_to_remove in cod_qps_to_be_removed:
+        try:
+            query = text(f"""
+            DELETE FROM 
+                enaplic_management.dbo.tb_qps 
+            WHERE
+                cod_qp = '{qp_to_remove}'
+            """)
+            db.session.execute(query)
+        except Exception as ex:
+            error_message = f"Error to find all QPs: {ex}"
+            logging.error(error_message)
+            send_email("API Error - find_all_qp()", error_message)
 
 
 def clean_string(input_string: str) -> str:
