@@ -482,16 +482,71 @@ def find_all_qp():
         send_email("API Error - find_all_qp()", error_message)
 
 
-def send_all_notifications_emails():
+def send_email_notification(operation: str):
     try:
         rows = find_all_qp()
         if rows:
             dataframe = pd.DataFrame(rows)
         else:
             raise Exception("Não foi encontrada nenhuma QP durante a consulta.")
+
+        if operation == 'open_late':
+            condition = dataframe[(dataframe['status_qp'] == 'A') & (dataframe['vl_delay'] < 0)]
+            subject = "QPS ABERTAS EM ATRASO"
+            message = generate_email_body(condition, "QP(s) abertas em atraso")
+
+        elif operation == 'open_up_to_date':
+            valid_delays = [5, 10, 15]
+            condition = dataframe[(dataframe['status_qp'] == 'A') & (dataframe['vl_delay'].isin(valid_delays))]
+            subject = "QPS ABERTAS EM DIA"
+            message = generate_email_body(condition, "QP(s) abertas em dia")
+
+        elif operation == 'closed_no_date':
+            condition = dataframe[(dataframe['status_qp'] == 'F') & (dataframe['vl_delay'] <= 0)]
+            subject = "QPS CONCLUÍDAS SEM PREENCHIMENTO DA DATA DE ENTREGA"
+            message = generate_email_body(condition, "QP(s) concluídas sem preenchimento da data de entrega")
+
+        if condition.empty:
+            raise Exception(f"Não há registros que atendam à condição para a operação {operation}.")
+
+        send_email(subject, message, operation)
         return True, "✔️ Serviço de notificação por e-mail executado com sucesso!"
     except Exception as ex:
-        return False, ex
+        return False, str(ex)
+
+
+def generate_email_body(df: pd.DataFrame, description: str) -> str:
+    num_qps = len(df)
+    df_html = df.to_html(index=False, border=0, justify='center', classes='table table-striped')
+
+    body = f"""
+    <html>
+    <head>
+        <style>
+            .table {{
+                width: 100%;
+                border-collapse: collapse;
+            }}
+            .table-striped tbody tr:nth-of-type(odd) {{
+                background-color: #f9f9f9;
+            }}
+            th, td {{
+                text-align: center;
+                padding: 8px;
+                border: 1px solid #dddddd;
+            }}
+        </style>
+    </head>
+    <body>
+        <h2>{description}</h2>
+        <p>Existem <strong>{num_qps} QP(s)</strong> que atendem à condição especificada:</p>
+        {df_html}
+        <p>Este e-mail foi gerado automaticamente pelo <strong>🦾 Eureka® BOT</strong>.</p>
+    </body>
+    </html>
+    """
+
+    return body
 
 
 def delete_qp_by_status(status_qp: str, data_sharepoint_qp_files: Dict[str, Any]):
