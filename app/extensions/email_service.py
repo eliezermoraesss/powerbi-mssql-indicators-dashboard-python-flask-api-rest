@@ -20,7 +20,7 @@ def send_email(subject, body, operation=None):
             for email in email_list:
                 recipients.append(email)
     elif operation == 'closed_no_date':
-        send_only_this_areas = ['ENGENHARIA', 'PCP', 'FISCAL', 'COMPRAS']
+        send_only_this_areas = ['DESENVOLVIMENTO', 'GESTAO', 'PCP', 'DIRETORIA']
 
         # Criar um novo dicionário contendo apenas os setores desejados
         filtered_recipients = {area: emails for area, emails in email_params['recipients'].items() if area in send_only_this_areas}
@@ -29,13 +29,18 @@ def send_email(subject, body, operation=None):
         recipients = [email for email_list in filtered_recipients.values() for email in email_list]
 
     recipients = list(set(recipients))
+    recipients.sort()
 
     # Configure the email
     msg = MIMEMultipart()
     msg["From"] = sender_email
     msg["To"] = ", ".join(recipients)
     msg["Subject"] = subject
-    msg.attach(MIMEText(body, "html"))
+
+    if operation is not None:
+        msg.attach(MIMEText(body, "html"))
+    else:
+        msg.attach(MIMEText(body, "plain"))
 
     # Connect to the Gmail SMTP server and send the email
     try:
