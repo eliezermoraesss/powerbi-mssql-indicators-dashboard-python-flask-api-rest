@@ -517,12 +517,11 @@ def send_email_notification(operation: str):
             if not dataframe.empty:
                 dataframe = formatar_dataframe_qps(dataframe, operation)
                 status_message = ("<strong>FINALIZADAS ✅</strong>, os produtos foram <strong>ENTREGUES 🚚</strong>, "
-                                  "mas a <strong>DATA DE ENTREGA 📅</strong><br><strong>NÃO FOI"
+                                  "mas a <strong>DATA DE ENTREGA 📅</strong><br><strong>NÃO FOI "
                                   "PREENCHIDA</strong> no <strong>EUREKA® QPS ⚠️<br></strong><br>🤖 Recomendo "
-                                  "preencher a data para"
+                                  "preencher a data para "
                                   "mantermos nosso histórico completo e gerarmos análises mais precisas, que nos "
-                                  "ajudarão"
-                                  "a tomar decisões melhores no futuro.")
+                                  "ajudarão a tomar decisões melhores no futuro.")
                 message = generate_email_body(dataframe, "QP(s) finalizadas sem data de entrega 📅❌", status_message)
 
         if dataframe.empty:
@@ -618,13 +617,13 @@ def delete_qp_by_status(status_qp: str, data_sharepoint_qp_files: Dict[str, Any]
             DELETE FROM 
                 enaplic_management.dbo.tb_qps 
             WHERE
-                cod_qp = '{qp_to_remove}'
+                cod_qp = :cod_qp
             """)
-            db.session.execute(query)
+            db.session.execute(query, {'cod_qp': qp_to_remove})
         except Exception as ex:
-            error_message = f"Error to find all QPs: {ex}"
+            error_message = f"Error to delete QPs from tb_qps: {ex}"
             logging.error(error_message)
-            send_email("API Error - find_all_qp()", error_message)
+            send_email("API Error - delete_qp_by_status()", error_message)
 
 
 def clean_string(input_string: str) -> str:

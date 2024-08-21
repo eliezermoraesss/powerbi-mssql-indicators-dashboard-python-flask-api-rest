@@ -128,7 +128,7 @@ def send_email_qp():
 def scheduled_task_save_all_indicators():
     try:
         logging.info("🕗 scheduled: Atualização de todos Indicadores em andamento...")
-        requests.post('http://localhost:5000/indicators/save?qp=open', timeout=600)  # 600 seconds or 10 minutes
+        requests.post('http://localhost:5000/indicators/save?qp=open', timeout=1800)  # 1800 seconds or 30 minutes
         success_message = "🕗 scheduled: ✔️ Atualização dos Indicadores realizada com sucesso!\n\n🦾🤖 Eureka® BOT"
         logging.info(success_message)
     except requests.exceptions.ConnectionError as ex:
@@ -141,7 +141,7 @@ def scheduled_task_send_email_qp_open_late():
     url = 'http://localhost:5000/indicators/qp/send-email?type=open_late'
     try:
         logging.info('🕗 scheduled: Relatório de notificação por e-mail dos status das QPS abertas e atrasadas.')
-        requests.get(url)
+        requests.get(url, timeout=300)  # 300 seconds or 5 minutes
     except requests.exceptions.ConnectionError as ex:
         error_message = f"❌ Erro de conexão: {url}\n\n{ex}\n\n🦾🤖 Eureka® BOT"
         logging.error(error_message)
@@ -152,7 +152,7 @@ def scheduled_task_send_email_qp_open_up_to_date():
     url = 'http://localhost:5000/indicators/qp/send-email?type=open_up_to_date'
     try:
         logging.info('🕗 scheduled: Relatório de notificação por e-mail dos status das QPS abertas e em dia.')
-        requests.get(url)
+        requests.get(url, timeout=300)
     except requests.exceptions.ConnectionError as ex:
         error_message = f"❌ Erro de conexão: {url}\n\n{ex}\n\n🦾🤖 Eureka® BOT"
         logging.error(error_message)
@@ -163,7 +163,7 @@ def scheduled_task_send_email_qp_closed_no_date():
     url = 'http://localhost:5000/indicators/qp/send-email?type=closed_no_date'
     try:
         logging.info('🕗 scheduled: Relatório de notificação por e-mail dos status das QPS fechadas e sem data.')
-        requests.get(url)
+        requests.get(url, timeout=300)
     except requests.exceptions.ConnectionError as ex:
         error_message = f"❌ Erro de conexão: {url}\n\n{ex}\n\n🦾🤖 Eureka® BOT"
         logging.error(error_message)
