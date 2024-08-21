@@ -1,4 +1,6 @@
+import base64
 from datetime import datetime
+from pathlib import Path
 
 from pandas import DataFrame
 
@@ -557,6 +559,11 @@ def formatar_dataframe_qps(dataframe: pd.DataFrame, operation: str) -> DataFrame
 
 def generate_email_body(df: pd.DataFrame, description: str, status_message: str) -> str:
     num_qps = len(df)
+
+    image_path = Path(__file__).resolve().parent.parent.parent / "assets" / "images" / "logo_enaplic.jpg"
+    with open(image_path, "rb") as image_file:
+        encoded_image = base64.b64encode(image_file.read()).decode('utf-8')
+
     df_html = df.to_html(index=False, border=0, justify='center', classes='table table-striped')
 
     body = f"""
@@ -588,6 +595,7 @@ def generate_email_body(df: pd.DataFrame, description: str, status_message: str)
         <p>Atenciosamente,</p>
         <p><strong>🦾🤖 Eureka® BOT</strong></p>
         <p>👨‍💻 <i>Este e-mail foi gerado automaticamente e não há necessidade de respondê-lo.</i></p>
+        <img src="data:image/jpeg;base64,{encoded_image}" alt="Enaplic logo" width="400px">
     </body>
     </html>
     """

@@ -13,7 +13,7 @@ def read_email_params(operation=None):
         except Exception as ex:
             logging.error(f"Ocorreu um erro ao ler ENV_VAR = EMAIL_APP_PASSWORD_GMAIL: {ex}")
     else:
-        path = r"\\192.175.175.4\desenvolvimento\REPOSITORIOS\resources\application-properties\ENAPLIC_EMAILS.txt"
+        path = r"\\192.175.175.4\desenvolvimento\REPOSITORIOS\resources\application-properties\ENAPLIC_EMAILS_TEST.txt"
         try:
             with open(path, 'r') as file:
                 string = file.read()
