@@ -1,9 +1,4 @@
-import base64
 from datetime import datetime
-from pathlib import Path
-
-from pandas import DataFrame
-
 from app import db
 from sqlalchemy import text
 from app.extensions.sharepoint_project_data import get_sharepoint_project_data
@@ -497,75 +492,33 @@ def send_email_notification(operation: str):
         else:
             raise Exception("Não foi encontrada nenhuma QP durante a consulta.")
 
-        subject_title = "🦾🤖 Eureka® BOT INFORMA - NOTIFICAÇÃO PERIÓDICA DE QPS 🕗"
-
         if operation == 'open_late':
-            dataframe = dataframe[(dataframe['status_qp'] == 'A') & (dataframe['vl_delay'] < 0)]
-
-            if not dataframe.empty:
-                dataframe = formatar_dataframe_qps(dataframe, operation)
-                status_message = "<strong>atrasadas em relação ao prazo de entrega! ⚠️</strong>"
-                message = generate_email_body(dataframe, "QP(s) abertas em atraso ⏰📅", status_message)
+            condition = dataframe[(dataframe['status_qp'] == 'A') & (dataframe['vl_delay'] < 0)]
+            subject = "QPS ABERTAS EM ATRASO"
+            message = generate_email_body(condition, "QP(s) abertas em atraso")
 
         elif operation == 'open_up_to_date':
-            dataframe = dataframe[(dataframe['status_qp'] == 'A') & (dataframe['vl_delay'] >= 0) & (dataframe['vl_delay'] <= 30)]
-
-            if not dataframe.empty:
-                dataframe = formatar_dataframe_qps(dataframe, operation)
-                status_message = "<strong>próximas do prazo de entrega! ⚠️</strong>"
-                message = generate_email_body(dataframe, "QP(s) abertas em dia 📅✅", status_message)
+            valid_delays = [5, 10, 15]
+            condition = dataframe[(dataframe['status_qp'] == 'A') & (dataframe['vl_delay'].isin(valid_delays))]
+            subject = "QPS ABERTAS EM DIA"
+            message = generate_email_body(condition, "QP(s) abertas em dia")
 
         elif operation == 'closed_no_date':
-            dataframe = dataframe[(dataframe['status_qp'] == 'F') & (dataframe['vl_delay'] < 0)]
+            condition = dataframe[(dataframe['status_qp'] == 'F') & (dataframe['vl_delay'] <= 0)]
+            subject = "QPS CONCLUÍDAS SEM PREENCHIMENTO DA DATA DE ENTREGA"
+            message = generate_email_body(condition, "QP(s) concluídas sem preenchimento da data de entrega")
 
-            if not dataframe.empty:
-                dataframe = formatar_dataframe_qps(dataframe, operation)
-                status_message = ("<strong>FINALIZADAS ✅</strong>, os produtos foram <strong>ENTREGUES 🚚</strong>, "
-                                  "mas a <strong>DATA DE ENTREGA 📅</strong><br><strong>NÃO FOI "
-                                  "PREENCHIDA</strong> no <strong>EUREKA® QPS ⚠️<br></strong><br>🤖 Recomendo "
-                                  "preencher a data para "
-                                  "mantermos nosso histórico completo e gerarmos análises mais precisas, que nos "
-                                  "ajudarão a tomar decisões melhores no futuro.")
-                message = generate_email_body(dataframe, "QP(s) finalizadas sem data de entrega 📅❌", status_message)
-
-        if dataframe.empty:
+        if condition.empty:
             raise Exception(f"Não há registros que atendam à condição para a operação {operation}.")
 
-        send_email(subject_title, message, operation)
+        send_email(subject, message, operation)
         return True, "✔️ Serviço de notificação por e-mail executado com sucesso!"
     except Exception as ex:
         return False, str(ex)
 
 
-def formatar_dataframe_qps(dataframe: pd.DataFrame, operation: str) -> DataFrame:
-    if operation != 'closed_no_date':
-        dataframe = dataframe.drop(columns=['id', 'S_T_A_M_P', 'dt_completed_qp'])
-        dataframe['status_qp'] = dataframe['status_qp'].replace('A', 'ABERTO')
-    else:
-        dataframe = dataframe.drop(columns=['id', 'S_T_A_M_P'])
-        dataframe = dataframe.rename(columns={'dt_completed_qp': 'DATA DE ENTREGA'})
-        dataframe['status_qp'] = dataframe['status_qp'].replace('F', 'FINALIZADA')
-
-    dataframe['cod_qp'] = dataframe['cod_qp'].astype(str).str.lstrip('0')
-    dataframe = dataframe.rename(columns={
-        'cod_qp': 'QP',
-        'des_qp': 'PROJETO',
-        'status_qp': 'STATUS',
-        'dt_open_qp': 'DATA DE EMISSÃO',
-        'dt_end_qp': 'PRAZO DE ENTREGA',
-        'vl_delay': 'SALDO (EM DIAS)',
-        'status_delivery': 'STATUS DE ENTREGA'
-    })
-    return dataframe
-
-
-def generate_email_body(df: pd.DataFrame, description: str, status_message: str) -> str:
+def generate_email_body(df: pd.DataFrame, description: str) -> str:
     num_qps = len(df)
-
-    image_path = Path(__file__).resolve().parent.parent.parent / "assets" / "images" / "logo_enaplic.jpg"
-    with open(image_path, "rb") as image_file:
-        encoded_image = base64.b64encode(image_file.read()).decode('utf-8')
-
     df_html = df.to_html(index=False, border=0, justify='center', classes='table table-striped')
 
     body = f"""
@@ -588,16 +541,9 @@ def generate_email_body(df: pd.DataFrame, description: str, status_message: str)
     </head>
     <body>
         <h2>{description}</h2>
-        <p>🤖 Olá, bom dia!</p>
-        <p>🤖 Localizei <strong>{num_qps} QP(s)</strong> que estão {status_message}</p>
-        <br>
+        <p>Existem <strong>{num_qps} QP(s)</strong> que atendem à condição especificada:</p>
         {df_html}
-        <br>
-        <p>🤖 Desejo à você um ótimo dia!</p>
-        <p>Atenciosamente,</p>
-        <p><strong>🦾🤖 Eureka® BOT</strong></p>
-        <p>👨‍💻 <i>Este e-mail foi gerado automaticamente e não há necessidade de respondê-lo.</i></p>
-        <img src="data:image/jpeg;base64,{encoded_image}" alt="Enaplic logo" width="400px">
+        <p>Este e-mail foi gerado automaticamente pelo <strong>🦾 Eureka® BOT</strong>.</p>
     </body>
     </html>
     """
@@ -627,13 +573,13 @@ def delete_qp_by_status(status_qp: str, data_sharepoint_qp_files: Dict[str, Any]
             DELETE FROM 
                 enaplic_management.dbo.tb_qps 
             WHERE
-                cod_qp = :cod_qp
+                cod_qp = '{qp_to_remove}'
             """)
-            db.session.execute(query, {'cod_qp': qp_to_remove})
+            db.session.execute(query)
         except Exception as ex:
-            error_message = f"Error to delete QPs from tb_qps: {ex}"
+            error_message = f"Error to find all QPs: {ex}"
             logging.error(error_message)
-            send_email("API Error - delete_qp_by_status()", error_message)
+            send_email("API Error - find_all_qp()", error_message)
 
 
 def clean_string(input_string: str) -> str:
