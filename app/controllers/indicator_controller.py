@@ -318,6 +318,7 @@ def update_all_qps_table(data_proj_indicator: Dict[str, Any], status_qp: str) ->
             if status_qp == 'closed':
                 insert_params = query_params.copy()
                 insert_params['status_qp'] = 'F'
+                insert_params['status_entrega'] = 'SEM DATA DE ENTREGA'
                 if not find_qp_by_cod_qp(cod_qp, status_qp):
                     insert = text(f"""
                                 INSERT INTO 
@@ -330,6 +331,7 @@ def update_all_qps_table(data_proj_indicator: Dict[str, Any], status_qp: str) ->
                     db.session.commit()
                 else:
                     update_params = query_params.copy()
+                    update_params['status_entrega'] = 'SEM DATA DE ENTREGA'
                     data_de_entrega = get_all_data_conclusao(cod_qp)
                     if data_de_entrega is not None:
                         intervalo_de_dias_com_data_entrega = (
