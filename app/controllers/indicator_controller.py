@@ -516,7 +516,7 @@ def send_email_notification(operation: str):
                 message = generate_email_body(dataframe, "QP(s) abertas em dia 📅✅", status_message)
 
         elif operation == 'closed_no_date':
-            dataframe = dataframe[(dataframe['status_qp'] == 'F') & (dataframe['vl_delay'] < 0)]
+            dataframe = dataframe[(dataframe['status_qp'] == 'F') & (dataframe['vl_delay'] < 0) & (dataframe['status_delivery'] == 'SEM DATA DE ENTREGA')]
 
             if not dataframe.empty:
                 dataframe = formatar_dataframe_qps(dataframe, operation)
