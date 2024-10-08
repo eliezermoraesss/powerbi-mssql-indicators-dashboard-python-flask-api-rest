@@ -26,7 +26,7 @@ def all_indicators():
         logging.info("request: Consulta de todos os Indicadores em andamento...")
         response = get_all_indicators()
         send_email("🤖 Eureka® BOT - /indicators", f"✔️ Consulta de todos Indicadores realizada com "
-                                                      f"sucesso!\n\n{response}\n\n🦾🤖 Eureka® BOT")
+                                                  f"sucesso!\n\n{response}\n\n🦾🤖 Eureka® BOT")
         return jsonify(response), 200
     except Exception as e:
         error_message = f"❌ Erro ao consultar todos os indicadores: {e}\n\n🦾🤖 Eureka® BOT"
@@ -38,11 +38,23 @@ def all_indicators():
 @app.route('/indicators/totvs', methods=['GET'])
 def all_totvs_indicators():
     try:
-        logging.info("request: Consulta dos Indicadores TOTVS em andamento...")
-        response = get_all_totvs_indicators()
-        send_email("🤖 Eureka® BOT INFO - /indicators/totvs", f"✔️ Consulta de Indicadores TOTVS realizada com "
+        status_qp = request.args.get('qp')
+        if status_qp is None:
+            return abort(400, description="Parameter 'qp' is required")
+        if status_qp == 'open':
+            logging.info("request: Consulta dos Indicadores TOTVS de QPS ABERTAS em andamento...")
+            response = get_all_totvs_indicators(status_qp)
+            send_email("🤖 Eureka® BOT INFO - /indicators/totvs", f"✔️ Consulta de Indicadores TOTVS de QPS ABERTAS realizada com "
                                                                  f"sucesso!\n\n{response}\n\n🦾🤖 Eureka® BOT ")
-        return jsonify(response), 200
+            return jsonify(response), 200
+        elif status_qp == 'closed':
+            logging.info("request: Consulta dos Indicadores TOTVS de QPS FECHADAS em andamento...")
+            response = get_all_totvs_indicators(status_qp)
+            send_email("🤖 Eureka® BOT INFO - /indicators/totvs", f"✔️ Consulta de Indicadores TOTVS de QPS FECHADAS realizada com "
+                                                                 f"sucesso!\n\n{response}\n\n🦾🤖 Eureka® BOT ")
+            return jsonify(response), 200
+        else:
+            return abort(400, description="Unknown value for 'qp'")
     except Exception as e:
         error_message = f"❌ Erro ao consultar os indicadores do TOTVS: {e}\n\n🦾🤖 Eureka® BOT"
         logging.error(error_message)
@@ -54,16 +66,14 @@ def all_totvs_indicators():
 def save_all_indicators():
     try:
         status_qp = request.args.get('qp')
-
         if status_qp is None:
             return abort(400, description="Parameter 'qp' is required")
         if status_qp == 'open' or status_qp == 'test':
-
-            logging.info("request: 🤖 Atualização dos Indicadores e QPS ABERTAS em andamento...")
+            logging.info("request: 🤖 Atualização dos Indicadores das QPS ABERTAS em andamento...")
             project_data = find_all_sharepoint_indicators(status_qp)
-            totvs_indicators = get_all_totvs_indicators()
-            save_indicators(project_data, totvs_indicators)
-            success_message = ("✔️ Atualização dos Indicadores e QPS ABERTAS realizada com sucesso!\n\n🦾🤖 "
+            totvs_indicators = get_all_totvs_indicators(status_qp)
+            save_indicators(project_data, totvs_indicators, status_qp)
+            success_message = ("✔️ Atualização dos Indicadores das QPS ABERTAS realizada com sucesso!\n\n🦾🤖 "
                                "Eureka® BOT")
             logging.info(success_message)
             send_email("🤖 Eureka® BOT INFO - /indicators/save?qp=open - Success ✔️", success_message)
@@ -71,10 +81,11 @@ def save_all_indicators():
             return success_message, 201
 
         elif status_qp == 'closed':
-            logging.info("request: 🤖 Atualização das QPS CONCLUÍDAS em andamento...")
-            find_all_sharepoint_indicators(status_qp)
-
-            sucess_message = "✔️ Atualização das QPS CONCLUÍDAS realizada com sucesso!\n\n🦾🤖 Eureka® BOT"
+            logging.info("request: 🤖 Atualização dos Indicadores das QPS FECHADAS em andamento...")
+            project_data = find_all_sharepoint_indicators(status_qp)
+            totvs_indicators = get_all_totvs_indicators(status_qp)
+            save_indicators(project_data, totvs_indicators, status_qp, False)
+            sucess_message = "✔️ Atualização dos Indicadores das QPS FECHADAS realizada com sucesso!\n\n🦾🤖 Eureka® BOT"
             logging.info(sucess_message)
             send_email("🤖 Eureka® BOT INFO - /indicators/save?qp=closed - Success ✔️", sucess_message)
             return sucess_message, 201
@@ -91,13 +102,13 @@ def save_all_indicators():
 @app.route('/indicators/qp/closed', methods=['GET'])
 def find_all_end_qps():
     try:
-        logging.info("request: 🤖 Consultando QPS CONCLUÍDAS...")
+        logging.info("request: 🤖 Consultando QPS FECHADAS...")
         response = find_qp_by_status_qp("closed")
-        send_email("🤖 Eureka® BOT - /qp/closed", f"✔️ Requisição de QPS CONCLUÍDAS realizada com "
-                                                     f"sucesso!\n\n{response}\n\n🦾🤖 Eureka® BOT")
-        return "✔️ Requisição de QPS CONCLUÍDAS realizada com sucesso!", 200
+        send_email("🤖 Eureka® BOT - /qp/closed", f"✔️ Requisição de QPS FECHADAS realizada com "
+                                                 f"sucesso!\n\n{response}\n\n🦾🤖 Eureka® BOT")
+        return "✔️ Requisição de QPS FECHADAS realizada com sucesso!", 200
     except Exception as e:
-        error_message = f"❌ Erro ao consultar QPS CONCLUÍDAS: {e}\n\n🦾 Eureka® BOT"
+        error_message = f"❌ Erro ao consultar QPS FECHADAS: {e}\n\n🦾 Eureka® BOT"
         logging.error(error_message)
         send_email("❌ API Error - indicators/qp/closed", error_message)
         abort(500, description="Internal Server Error")
@@ -173,7 +184,8 @@ def scheduled_task_send_email_qp_closed_no_date():
 if __name__ == '__main__':
     america_sp_timezone = pytz.timezone('America/Sao_Paulo')
     scheduler = BackgroundScheduler(timezone=america_sp_timezone)
-    scheduler.add_job(scheduled_task_save_all_indicators, CronTrigger(day_of_week='1-5', hour=7, minute=0, timezone=america_sp_timezone))
+    scheduler.add_job(scheduled_task_save_all_indicators, CronTrigger(day_of_week='0-4', hour=7, minute=0, timezone=america_sp_timezone))
+    scheduler.add_job(scheduled_task_save_all_indicators, CronTrigger(day_of_week='0-4', hour=14, minute=0, timezone=america_sp_timezone))
     scheduler.add_job(scheduled_task_send_email_qp_open_late, CronTrigger(day_of_week='mon', hour=8, minute=30, timezone=america_sp_timezone))
     scheduler.add_job(scheduled_task_send_email_qp_open_up_to_date, CronTrigger(day_of_week='tue', hour=8, minute=30, timezone=america_sp_timezone))
     scheduler.add_job(scheduled_task_send_email_qp_closed_no_date, CronTrigger(day_of_week='wed', hour=8, minute=30, timezone=america_sp_timezone))

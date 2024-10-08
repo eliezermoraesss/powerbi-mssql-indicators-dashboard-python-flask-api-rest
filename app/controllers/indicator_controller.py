@@ -15,7 +15,6 @@ from app.extensions.email_service import send_email
 logging.basicConfig(level=logging.INFO)
 
 indicators_table = "tb_dashboard_indicators"
-indicators_table_list = ["tb_dashboard_indicators", "tb_current_dashboard_indicators"]
 file_name = {
     "open": "PROJ_INDICATORS.xlsm",
     "closed": "PROJ_INDICATORS_QP_CONCLUIDO.xlsm",
@@ -24,12 +23,13 @@ status = {"open": 'A', "closed": 'F'}
 
 
 def get_all_indicators() -> Dict[str, Any]:
-    result = find_qp_by_status_qp("open")
+    result = find_all_qp()
     cod_qps = [row[1] for row in result]
     data = {}
 
     indicators = {
         "descricao": "des_qp",
+        "status_qp": "status_qp",
         "data_emissao_qp": "dt_open_qp",
         "prazo_entrega_qp": "dt_end_qp",
         "data_inicio_proj": "dt_start_proj",
@@ -76,12 +76,10 @@ def get_all_indicators() -> Dict[str, Any]:
     return data
 
 
-def get_all_totvs_indicators() -> Dict[str, Any]:
-    result = find_qp_by_status_qp("open")
+def get_all_totvs_indicators(status_qp) -> Dict[str, Any]:
+    result = find_qp_by_status_qp(status_qp)
     cod_qps = [row[1] for row in result]
-
     data = {}
-
     for cod_qp in cod_qps:
         cod_qp_formatado = cod_qp.lstrip('0')
         try:
@@ -164,7 +162,7 @@ def insert_query(table_name):
     return text(f"""
                 INSERT INTO 
                     enaplic_management.dbo.{table_name} 
-                    (cod_qp, des_qp, dt_open_qp, dt_end_qp, dt_start_proj,
+                    (cod_qp, des_qp, status_qp, dt_open_qp, dt_end_qp, dt_start_proj,
                      dt_end_proj, vl_proj_duration, status_proj, 
                      vl_proj_all_prod, vl_proj_prod_cancel, vl_proj_modify_perc, 
                      vl_proj_released, vl_proj_finished, vl_proj_adjusted, 
@@ -173,7 +171,7 @@ def insert_query(table_name):
                      vl_mat_received, vl_mat_received_perc, vl_total_mp_pc_cost, vl_mp_pc_cost, 
                      vl_com_pc_cost, vl_mp_deliver_cost, vl_com_deliver_cost) 
                 VALUES
-                    (:qp, :description, :data_emissao_qp, :prazo_entrega_qp, :data_inicio_proj,
+                    (:qp, :description, :status_qp, :data_emissao_qp, :prazo_entrega_qp, :data_inicio_proj,
                      :data_fim_proj, :duracao_proj, :status_proj, 
                      :baseline, :desconsiderar, :indice_mudanca, 
                      :projeto_liberado, :projeto_pronto, :em_ajuste, 
@@ -190,59 +188,56 @@ def find_all_sharepoint_indicators(status_qp: str) -> Dict[str, Any]:
     return project_data
 
 
-def save_indicators(project_data: Dict[str, Any], totvs_indicators: Dict[str, Any]) -> None:
+def save_indicators(project_data: Dict[str, Any], totvs_indicators: Dict[str, Any], status_qp, clean_table=None) -> None:
     try:
-        for table in indicators_table_list:
-            if table == 'tb_current_dashboard_indicators':
-                db.session.execute(text(f"TRUNCATE TABLE enaplic_management.dbo.{table}"))
+        if clean_table is None:
+            db.session.execute(text(f"TRUNCATE TABLE enaplic_management.dbo.{indicators_table}"))
+        for cod_qp, project_indicators in project_data.items():
+            try:
+                query = insert_query(indicators_table)
+                op_total = int(totvs_indicators[cod_qp]['op_total'])
+                quant_pi_proj = int(project_indicators['quant_pi_proj'])
+                indice_pcp = round((op_total / quant_pi_proj) * 100, 2) if quant_pi_proj > 0 else 0
 
-            for cod_qp, project_indicators in project_data.items():
-                try:
-                    query = insert_query(table)
-
-                    op_total = int(totvs_indicators[cod_qp]['op_total'])
-                    quant_pi_proj = int(project_indicators['quant_pi_proj'])
-
-                    indice_pcp = round((op_total / quant_pi_proj) * 100, 2) if quant_pi_proj > 0 else 0
-
-                    db.session.execute(query, {
-                        'qp': cod_qp,
-                        'description': project_indicators['description'],
-                        'data_emissao_qp': project_indicators['data_emissao_qp'],
-                        'prazo_entrega_qp': project_indicators['prazo_entrega_qp'],
-                        'data_inicio_proj': project_indicators['data_inicio_proj'],
-                        'data_fim_proj': project_indicators['data_fim_proj'],
-                        'duracao_proj': int(project_indicators['duracao_proj']),
-                        'status_proj': project_indicators['status_proj'],
-                        'baseline': int(project_indicators['baseline']),
-                        'desconsiderar': int(project_indicators['desconsiderar']),
-                        'indice_mudanca': float(project_indicators['indice_mudanca']),
-                        'projeto_liberado': int(project_indicators['projeto_liberado']),
-                        'projeto_pronto': int(project_indicators['projeto_pronto']),
-                        'em_ajuste': int(project_indicators['em_ajuste']),
-                        'quant_pi_proj': int(quant_pi_proj),
-                        'quant_mp_proj': int(project_indicators['quant_mp_proj']),
-                        'op_total': op_total,
-                        'indice_pcp': float(indice_pcp),
-                        'indice_producao': float(totvs_indicators[cod_qp]['indice_producao']),
-                        'op_fechada': int(totvs_indicators[cod_qp]['op_fechada']),
-                        'sc_total': int(totvs_indicators[cod_qp]['sc_total']),
-                        'pc_total': int(totvs_indicators[cod_qp]['pc_total']),
-                        'indice_compra': float(totvs_indicators[cod_qp]['indice_compra']),
-                        'mat_entregue': int(totvs_indicators[cod_qp]['mat_entregue']),
-                        'indice_recebimento': float(totvs_indicators[cod_qp]['indice_recebimento']),
-                        'custo_total_mp_pc': float(totvs_indicators[cod_qp]['custo_total_mp_pc']),
-                        'custo_mp_pc': float(totvs_indicators[cod_qp]['custo_mp_pc']),
-                        'custo_item_com_pc': float(totvs_indicators[cod_qp]['custo_item_com_pc']),
-                        'custo_mp_mat_entregue': float(totvs_indicators[cod_qp]['custo_mp_mat_entregue']),
-                        'custo_item_com_mat_entregue': float(totvs_indicators[cod_qp]['custo_item_com_mat_entregue'])
-                    })
-                    db.session.commit()
-                except Exception as e:
-                    db.session.rollback()
-                    error_message = f"Error saving indicators for cod_qp {cod_qp}: {e}"
-                    logging.error(error_message)
-                    send_email("API Error - save_indicators", error_message)
+                db.session.execute(query, {
+                    'qp': cod_qp,
+                    'description': project_indicators['description'],
+                    'status_qp': status[status_qp],
+                    'data_emissao_qp': project_indicators['data_emissao_qp'],
+                    'prazo_entrega_qp': project_indicators['prazo_entrega_qp'],
+                    'data_inicio_proj': project_indicators['data_inicio_proj'],
+                    'data_fim_proj': project_indicators['data_fim_proj'],
+                    'duracao_proj': int(project_indicators['duracao_proj']),
+                    'status_proj': project_indicators['status_proj'],
+                    'baseline': int(project_indicators['baseline']),
+                    'desconsiderar': int(project_indicators['desconsiderar']),
+                    'indice_mudanca': float(project_indicators['indice_mudanca']),
+                    'projeto_liberado': int(project_indicators['projeto_liberado']),
+                    'projeto_pronto': int(project_indicators['projeto_pronto']),
+                    'em_ajuste': int(project_indicators['em_ajuste']),
+                    'quant_pi_proj': int(quant_pi_proj),
+                    'quant_mp_proj': int(project_indicators['quant_mp_proj']),
+                    'op_total': op_total,
+                    'indice_pcp': float(indice_pcp),
+                    'indice_producao': float(totvs_indicators[cod_qp]['indice_producao']),
+                    'op_fechada': int(totvs_indicators[cod_qp]['op_fechada']),
+                    'sc_total': int(totvs_indicators[cod_qp]['sc_total']),
+                    'pc_total': int(totvs_indicators[cod_qp]['pc_total']),
+                    'indice_compra': float(totvs_indicators[cod_qp]['indice_compra']),
+                    'mat_entregue': int(totvs_indicators[cod_qp]['mat_entregue']),
+                    'indice_recebimento': float(totvs_indicators[cod_qp]['indice_recebimento']),
+                    'custo_total_mp_pc': float(totvs_indicators[cod_qp]['custo_total_mp_pc']),
+                    'custo_mp_pc': float(totvs_indicators[cod_qp]['custo_mp_pc']),
+                    'custo_item_com_pc': float(totvs_indicators[cod_qp]['custo_item_com_pc']),
+                    'custo_mp_mat_entregue': float(totvs_indicators[cod_qp]['custo_mp_mat_entregue']),
+                    'custo_item_com_mat_entregue': float(totvs_indicators[cod_qp]['custo_item_com_mat_entregue'])
+                })
+                db.session.commit()
+            except Exception as e:
+                db.session.rollback()
+                error_message = f"Error saving indicators for cod_qp {cod_qp}: {e}"
+                logging.error(error_message)
+                send_email("API Error - save_indicators", error_message)
     except Exception as e:
         error_message = f"General error in save_indicators: {e}"
         logging.error(error_message)
@@ -392,26 +387,21 @@ def get_project_data(excel_file_name) -> Dict[str, Any]:
             data_proj_indicator = {}
             for qp, description in qps_description_dict.items():
                 df = dataframe_dict[qp]
-                # TODO
-                if excel_file_name == 'PROJ_INDICATORS.xlsm':
-                    baseline = df[df['ITEM'] == 'BASELINE']['GERAL'].values[0]  # REMOVER
-                    desconsiderar = df[df['ITEM'] == 'DESCONSIDERAR']['GERAL'].values[0] * -1  # REMOVER
-                    indice_mudanca = round((desconsiderar / baseline) * 100, 2) if baseline != 0 else 0  # REMOVER
 
-                    duracao_proj = df[df['ITEM'] == 'BASELINE']['DURACAO'].values[0]  # REMOVER
-                    duracao_proj = 0 if pd.isna(duracao_proj) else duracao_proj  # REMOVER
+                baseline = df[df['ITEM'] == 'BASELINE']['GERAL'].values[0]  # REMOVER
+                desconsiderar = df[df['ITEM'] == 'DESCONSIDERAR']['GERAL'].values[0] * -1  # REMOVER
+                indice_mudanca = round((desconsiderar / baseline) * 100, 2) if baseline != 0 else 0  # REMOVER
 
-                    data_inicio_proj = format_date(
-                        df[df['ITEM'] == 'BASELINE']['DATA_INICIO_PROJ'].values[0])  # REMOVER
-                    data_fim_proj = format_date(df[df['ITEM'] == 'BASELINE']['DATA_FIM_PROJ'].values[0])  # REMOVER
-                    data_inicio_proj = '' if data_inicio_proj == '00/01/1900' else data_inicio_proj  # REMOVER
-                    data_fim_proj = '' if data_fim_proj == '00/01/1900' else data_fim_proj  # REMOVER
+                duracao_proj = df[df['ITEM'] == 'BASELINE']['DURACAO'].values[0]  # REMOVER
+                duracao_proj = 0 if pd.isna(duracao_proj) else duracao_proj  # REMOVER
 
-                    status_proj = map_status_proj(df[df['ITEM'] == 'BASELINE']['STATUS_PROJETO'].values[0])
-                else:
-                    baseline, desconsiderar, indice_mudanca, duracao_proj = 0, 0, 0, 0  # REMOVER
-                    data_inicio_proj, data_fim_proj = '', ''  # REMOVER
-                    status_proj = map_status_proj('Finalizado')
+                data_inicio_proj = format_date(
+                    df[df['ITEM'] == 'BASELINE']['DATA_INICIO_PROJ'].values[0])  # REMOVER
+                data_fim_proj = format_date(df[df['ITEM'] == 'BASELINE']['DATA_FIM_PROJ'].values[0])  # REMOVER
+                data_inicio_proj = '' if data_inicio_proj == '00/01/1900' else data_inicio_proj  # REMOVER
+                data_fim_proj = '' if data_fim_proj == '00/01/1900' else data_fim_proj  # REMOVER
+
+                status_proj = map_status_proj(df[df['ITEM'] == 'BASELINE']['STATUS_PROJETO'].values[0])
 
                 data_emissao_qp = format_date(df[df['ITEM'] == 'BASELINE']['DATA_EMISSAO'].values[0])  # REMOVER
                 prazo_entrega_qp = format_date(df[df['ITEM'] == 'BASELINE']['PRAZO_ENTREGA'].values[0])  # REMOVER
