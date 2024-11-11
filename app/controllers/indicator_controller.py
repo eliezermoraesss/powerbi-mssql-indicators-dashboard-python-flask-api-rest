@@ -86,27 +86,35 @@ def get_all_totvs_indicators(status_qp) -> Dict[str, Any]:
             data[cod_qp] = {
                 "op_total": get_indicator_value("COUNT(*)", "PROTHEUS12_R27.dbo.SC2010",
                                                 f"C2_ZZNUMQP LIKE '%{cod_qp_formatado}' AND D_E_L_E_T_ <> '*'"),
+
                 "op_fechada": get_indicator_value("COUNT(*)", "PROTHEUS12_R27.dbo.SC2010",
                                                   f"C2_ZZNUMQP LIKE '%{cod_qp_formatado}' AND C2_DATRF <> '       ' "
                                                   f"AND D_E_L_E_T_ <> '*'"),
+
                 "sc_total": get_indicator_value("COUNT(DISTINCT (C1_NUM + C1_ITEM))", "PROTHEUS12_R27.dbo.SC1010",
                                                 f"C1_ZZNUMQP LIKE '%{cod_qp_formatado}' AND D_E_L_E_T_ <> '*'"),
+
                 "pc_total": get_indicator_value("COUNT(DISTINCT (C7_NUM + C7_ITEM))", "PROTHEUS12_R27.dbo.SC7010",
                                                 f"C7_ZZNUMQP LIKE '%{cod_qp_formatado}' AND C7_NUMSC <> '      ' "
                                                 f"AND D_E_L_E_T_ <> '*'"),
+
                 "mat_entregue": get_indicator_value("COUNT(DISTINCT (C7_NUM + C7_ITEM))", "PROTHEUS12_R27.dbo.SC7010",
                                                     f"C7_ZZNUMQP LIKE '%{cod_qp_formatado}' AND C7_ENCER = 'E' "
                                                     f"AND C7_NUMSC <> '      ' AND D_E_L_E_T_ <> '*'"),
+
                 "custo_mp_pc": get_indicator_value("ROUND(SUM(C7_TOTAL), 2)", "PROTHEUS12_R27.dbo.SC7010",
                                                    f"C7_ZZNUMQP LIKE '%{cod_qp_formatado}' AND C7_LOCAL = '01' "
                                                    f"AND D_E_L_E_T_ <> '*'"),
+
                 "custo_item_com_pc": get_indicator_value("ROUND(SUM(C7_TOTAL), 2)", "PROTHEUS12_R27.dbo.SC7010",
                                                          f"C7_ZZNUMQP LIKE '%{cod_qp_formatado}' AND C7_LOCAL <> '01' "
                                                          f"AND D_E_L_E_T_ <> '*'"),
+
                 "custo_mp_mat_entregue": get_indicator_value("ROUND(SUM(C7_TOTAL), 2)", "PROTHEUS12_R27.dbo.SC7010",
                                                              f"C7_ZZNUMQP LIKE '%{cod_qp_formatado}' "
                                                              f"AND C7_NUMSC <> '      ' AND C7_ENCER = 'E' AND "
                                                              f"C7_LOCAL = '01' AND D_E_L_E_T_ <> '*'"),
+
                 "custo_item_com_mat_entregue": get_indicator_value(
                     "ROUND(SUM(C7_TOTAL), 2)", "PROTHEUS12_R27.dbo.SC7010", f"C7_ZZNUMQP "
                                                                             f"LIKE '%{cod_qp_formatado}' AND C7_NUMSC "
@@ -479,11 +487,27 @@ def find_all_qp():
         send_email("API Error - find_all_qp()", error_message)
 
 
+def find_all_indicators():
+    try:
+        query = text("SELECT * FROM enaplic_management.dbo.tb_dashboard_indicators")
+        return db.session.execute(query).fetchall()
+    except Exception as ex:
+        error_message = f'Error to find all Baseline Indicators: {ex}'
+        logging.error(error_message)
+        send_email("API Error - find_all_indicators()", error_message)
+
+
 def send_email_notification(operation: str):
     try:
-        rows = find_all_qp()
-        if rows:
-            dataframe = pd.DataFrame(rows)
+        rows_all_qps = find_all_qp()
+        rows_all_indicators = find_all_indicators()
+        if rows_all_qps and rows_all_indicators:
+            dataframe = pd.DataFrame(rows_all_qps)
+            dataframe_all_indicators = pd.DataFrame(rows_all_indicators)
+
+            dataframe = dataframe.merge(dataframe_all_indicators[['cod_qp', 'status_proj', 'vl_proj_duration']],
+                                        on='cod_qp', how='left')
+
         else:
             raise Exception("Não foi encontrada nenhuma QP durante a consulta.")
 
@@ -528,14 +552,7 @@ def send_email_notification(operation: str):
 
 
 def formatar_dataframe_qps(dataframe: pd.DataFrame, operation: str) -> DataFrame:
-    if operation != 'closed_no_date':
-        dataframe = dataframe.drop(columns=['id', 'S_T_A_M_P', 'dt_completed_qp'])
-        dataframe['status_qp'] = dataframe['status_qp'].replace('A', 'ABERTO')
-    else:
-        dataframe = dataframe.drop(columns=['id', 'S_T_A_M_P'])
-        dataframe = dataframe.rename(columns={'dt_completed_qp': 'DATA DE ENTREGA'})
-        dataframe['status_qp'] = dataframe['status_qp'].replace('F', 'FINALIZADA')
-
+    dataframe = dataframe.drop(columns=['id', 'S_T_A_M_P'])
     dataframe['cod_qp'] = dataframe['cod_qp'].astype(str).str.lstrip('0')
     dataframe = dataframe.rename(columns={
         'cod_qp': 'QP',
@@ -546,6 +563,23 @@ def formatar_dataframe_qps(dataframe: pd.DataFrame, operation: str) -> DataFrame
         'vl_delay': 'SALDO (EM DIAS)',
         'status_delivery': 'STATUS DE ENTREGA'
     })
+    if operation != 'closed_no_date':
+        dataframe = dataframe.drop(columns=['dt_completed_qp'])
+        dataframe['STATUS'] = dataframe['STATUS'].replace('A', 'ABERTO')
+        dataframe['status_proj'] = dataframe['status_proj'].replace({'N': 'NÃO INICIADO', 'A': 'EM ANDAMENTO',
+                                                                     'F': 'FINALIZADO'})
+        dataframe = dataframe.rename(columns={
+            'status_proj': 'STATUS PROJETO',
+            'vl_proj_duration': 'DURAÇÃO PROJETO (EM DIAS)'
+        })
+        new_order_columns = ['QP', 'PROJETO', 'STATUS', 'DATA DE EMISSÃO', 'PRAZO DE ENTREGA', 'SALDO (EM DIAS)',
+                             'STATUS PROJETO', 'DURAÇÃO PROJETO (EM DIAS)', 'STATUS DE ENTREGA']
+        dataframe = dataframe.reindex(columns=new_order_columns)
+    elif operation == 'closed_no_date':
+        dataframe = dataframe.rename(columns={'dt_completed_qp': 'DATA DE ENTREGA'})
+        dataframe['STATUS'] = dataframe['STATUS'].replace('F', 'FINALIZADA')
+        dataframe = dataframe.drop(columns=['status_proj', 'vl_proj_duration'])
+
     return dataframe
 
 
