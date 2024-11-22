@@ -26,7 +26,7 @@ def all_indicators():
         logging.info("request: Consulta de todos os Indicadores em andamento...")
         response = get_all_indicators()
         send_email("🤖 Eureka® BOT - /indicators", f"✔️ Consulta de todos Indicadores realizada com "
-                                                  f"sucesso!\n\n{response}\n\n🦾🤖 Eureka® BOT")
+                                                      f"sucesso!\n\n{response}\n\n🦾🤖 Eureka® BOT")
         return jsonify(response), 200
     except Exception as e:
         error_message = f"❌ Erro ao consultar todos os indicadores: {e}\n\n🦾🤖 Eureka® BOT"
@@ -45,7 +45,7 @@ def all_totvs_indicators():
             logging.info("request: Consulta dos Indicadores TOTVS de QPS ABERTAS em andamento...")
             response = get_all_totvs_indicators(status_qp)
             send_email("🤖 Eureka® BOT INFO - /indicators/totvs", f"✔️ Consulta de Indicadores TOTVS de QPS ABERTAS realizada com "
-                                                                 f"sucesso!\n\n{response}\n\n🦾🤖 Eureka® BOT ")
+                                                                     f"sucesso!\n\n{response}\n\n🦾🤖 Eureka® BOT ")
             return jsonify(response), 200
         elif status_qp == 'closed':
             logging.info("request: Consulta dos Indicadores TOTVS de QPS FECHADAS em andamento...")
@@ -105,7 +105,7 @@ def find_all_end_qps():
         logging.info("request: 🤖 Consultando QPS FECHADAS...")
         response = find_qp_by_status_qp("closed")
         send_email("🤖 Eureka® BOT - /qp/closed", f"✔️ Requisição de QPS FECHADAS realizada com "
-                                                 f"sucesso!\n\n{response}\n\n🦾🤖 Eureka® BOT")
+                                                     f"sucesso!\n\n{response}\n\n🦾🤖 Eureka® BOT")
         return "✔️ Requisição de QPS FECHADAS realizada com sucesso!", 200
     except Exception as e:
         error_message = f"❌ Erro ao consultar QPS FECHADAS: {e}\n\n🦾 Eureka® BOT"
@@ -133,6 +133,27 @@ def send_email_qp():
         error_message = f"{ex}"
         logging.error(error_message)
         send_email(f"🤖 Eureka® BOT INFO - /indicators/qp/send-email?type={operation} - Error ❌", error_message)
+        return jsonify({"error": error_message}), 500
+
+
+@app.route("/indicators/qr/send-email", methods=['GET'])
+def send_email_qr():
+    operation = request.args.get('status')
+    if operation not in ['open']:
+        error_message = f"❌ Tipo de operação inválido: {operation}"
+        logging.error(error_message)
+        return jsonify({"error": error_message}), 400
+
+    try:
+        sent_email, message = send_email_notification(operation)
+        if not sent_email:
+            raise Exception(f"{message}")
+        logging.info(message)
+        return jsonify({"message": message}), 200
+    except Exception as ex:
+        error_message = f"{ex}"
+        logging.error(error_message)
+        send_email(f"🤖 Eureka® BOT INFO - /indicators/qr/send-email?status={operation} - Error ❌", error_message)
         return jsonify({"error": error_message}), 500
 
 
@@ -181,14 +202,27 @@ def scheduled_task_send_email_qp_closed_no_date():
         send_email(f"🤖 Eureka® BOT INFO - Request error {url} ❌", error_message)
 
 
+def scheduled_task_send_email_open_qr():
+    url = 'http://localhost:5000/indicators/qr/send-email?status=open'
+    try:
+        logging.info('🕗 scheduled: Relatório de notificação por e-mail dos status das QRS abertas.')
+        requests.get(url, timeout=300)
+    except requests.exceptions.ConnectionError as ex:
+        error_message = f"❌ Erro de conexão: {url}\n\n{ex}\n\n🦾🤖 Eureka® BOT"
+        logging.error(error_message)
+        send_email(f"🤖 Eureka® BOT INFO - Request error {url} ❌", error_message)
+
+
 if __name__ == '__main__':
     america_sp_timezone = pytz.timezone('America/Sao_Paulo')
     scheduler = BackgroundScheduler(timezone=america_sp_timezone)
-    scheduler.add_job(scheduled_task_save_all_indicators, CronTrigger(day_of_week='0-4', hour=7, minute=0, timezone=america_sp_timezone))
-    scheduler.add_job(scheduled_task_save_all_indicators, CronTrigger(day_of_week='0-4', hour=14, minute=0, timezone=america_sp_timezone))
-    scheduler.add_job(scheduled_task_send_email_qp_open_late, CronTrigger(day_of_week='mon', hour=8, minute=30, timezone=america_sp_timezone))
-    scheduler.add_job(scheduled_task_send_email_qp_open_up_to_date, CronTrigger(day_of_week='tue', hour=8, minute=30, timezone=america_sp_timezone))
-    scheduler.add_job(scheduled_task_send_email_qp_closed_no_date, CronTrigger(day_of_week='wed', hour=8, minute=30, timezone=america_sp_timezone))
+    scheduler.add_job(scheduled_task_save_all_indicators, CronTrigger(day_of_week='0-4', hour=8, minute=0, timezone=america_sp_timezone))
+    scheduler.add_job(scheduled_task_save_all_indicators, CronTrigger(day_of_week='0-4', hour=15, minute=0, timezone=america_sp_timezone))
+    scheduler.add_job(scheduled_task_send_email_qp_open_late, CronTrigger(day_of_week='mon', hour=9, minute=30, timezone=america_sp_timezone))
+    scheduler.add_job(scheduled_task_send_email_qp_open_up_to_date, CronTrigger(day_of_week='tue', hour=9, minute=30, timezone=america_sp_timezone))
+    scheduler.add_job(scheduled_task_send_email_qp_closed_no_date, CronTrigger(day_of_week='wed', hour=9, minute=30, timezone=america_sp_timezone))
+    scheduler.add_job(scheduled_task_send_email_open_qr, CronTrigger(day_of_week='mon', hour=9, minute=0, timezone=america_sp_timezone))
+    scheduler.add_job(scheduled_task_send_email_open_qr, CronTrigger(day_of_week='wed', hour=15, minute=20, timezone=america_sp_timezone))
     logging.info(f"Job agendado para executar no fuso horário {america_sp_timezone}")
     scheduler.start()
     logging.info("Scheduler iniciado!")

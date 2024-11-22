@@ -21,12 +21,10 @@ def send_email(subject, body, operation=None):
                 recipients.append(email)
     elif operation == 'closed_no_date':
         send_only_this_areas = ['DESENVOLVIMENTO', 'GESTAO', 'PCP', 'DIRETORIA']
-
-        # Criar um novo dicionário contendo apenas os setores desejados
-        filtered_recipients = {area: emails for area, emails in email_params['recipients'].items() if area in send_only_this_areas}
-
-        # Extrair todos os emails do novo dicionário e armazená-los em 'recipients'
-        recipients = [email for email_list in filtered_recipients.values() for email in email_list]
+        recipients = email_extract(send_only_this_areas, email_params)
+    elif operation == 'open':
+        send_only_this_ares = ['DESENVOLVIMENTO', 'GESTAO', 'ALMOXARIFADO', 'PCP', 'COMPRAS', 'FISCAL']
+        recipients = email_extract(send_only_this_ares, email_params)
 
     recipients = list(set(recipients))
     recipients.sort()
@@ -44,6 +42,7 @@ def send_email(subject, body, operation=None):
 
     # Connect to the Gmail SMTP server and send the email
     try:
+        # server = smtplib.SMTP("mail.enaplic.com.br", 587)
         server = smtplib.SMTP("smtp.gmail.com", 587)
         server.starttls()
         server.login(sender_email, password)
@@ -56,3 +55,13 @@ def send_email(subject, body, operation=None):
     except Exception as e:
         logging.error(f"Failed to send email: {e}")
 
+
+def email_extract(areas: list, email_params: dict):
+    # Criar um novo dicionário contendo apenas os setores desejados
+    filtered_recipients = {
+        area: emails for area, emails in email_params['recipients'].items() if area in areas
+    }
+
+    # Extrair todos os emails do novo dicionário e armazená-los em 'recipients'
+    recipients = [email for email_list in filtered_recipients.values() for email in email_list]
+    return recipients

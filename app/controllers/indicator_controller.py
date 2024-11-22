@@ -1,4 +1,5 @@
 import base64
+import locale
 from datetime import datetime
 from pathlib import Path
 
@@ -196,7 +197,8 @@ def find_all_sharepoint_indicators(status_qp: str) -> Dict[str, Any]:
     return project_data
 
 
-def save_indicators(project_data: Dict[str, Any], totvs_indicators: Dict[str, Any], status_qp, clean_table=None) -> None:
+def save_indicators(project_data: Dict[str, Any], totvs_indicators: Dict[str, Any], status_qp,
+                    clean_table=None) -> None:
     try:
         if clean_table is None:
             db.session.execute(text(f"TRUNCATE TABLE enaplic_management.dbo.{indicators_table}"))
@@ -403,16 +405,16 @@ def get_project_data(excel_file_name) -> Dict[str, Any]:
                 duracao_proj = df[df['ITEM'] == 'BASELINE']['DURACAO'].values[0]  # REMOVER
                 duracao_proj = 0 if pd.isna(duracao_proj) else duracao_proj  # REMOVER
 
-                data_inicio_proj = format_date(
+                data_inicio_proj = format_date_sharepoint(
                     df[df['ITEM'] == 'BASELINE']['DATA_INICIO_PROJ'].values[0])  # REMOVER
-                data_fim_proj = format_date(df[df['ITEM'] == 'BASELINE']['DATA_FIM_PROJ'].values[0])  # REMOVER
+                data_fim_proj = format_date_sharepoint(df[df['ITEM'] == 'BASELINE']['DATA_FIM_PROJ'].values[0])  # REMOVER
                 data_inicio_proj = '' if data_inicio_proj == '00/01/1900' else data_inicio_proj  # REMOVER
                 data_fim_proj = '' if data_fim_proj == '00/01/1900' else data_fim_proj  # REMOVER
 
                 status_proj = map_status_proj(df[df['ITEM'] == 'BASELINE']['STATUS_PROJETO'].values[0])
 
-                data_emissao_qp = format_date(df[df['ITEM'] == 'BASELINE']['DATA_EMISSAO'].values[0])  # REMOVER
-                prazo_entrega_qp = format_date(df[df['ITEM'] == 'BASELINE']['PRAZO_ENTREGA'].values[0])  # REMOVER
+                data_emissao_qp = format_date_sharepoint(df[df['ITEM'] == 'BASELINE']['DATA_EMISSAO'].values[0])  # REMOVER
+                prazo_entrega_qp = format_date_sharepoint(df[df['ITEM'] == 'BASELINE']['PRAZO_ENTREGA'].values[0])  # REMOVER
                 data_proj_indicator[qp] = {
                     "qp": qp,
                     "description": description,
@@ -497,95 +499,142 @@ def find_all_indicators():
         send_email("API Error - find_all_indicators()", error_message)
 
 
+def find_open_qrs():
+    try:
+        query = text(f"""	
+            -- QUERY PARA PROJETAR INFORMAÇÕES REFERENTE AOS PEDIDOS DE VENDA E NOTAS FISCAIS DE SAÍDA
+            SELECT
+                C6_NUM AS 'QR',
+                C5_ZZNOME AS 'CLIENTE',
+                C6_PRODUTO AS 'CÓDIGO',
+                C6_DESCRI AS 'DESCRIÇÃO',
+                C6_UM AS 'UNID.', 
+                C6_QTDVEN AS 'QTD. VENDA',
+                C5_EMISSAO 'PV ABERTO EM:',
+                C6_ENTREG AS 'DATA DE ENTREGA',
+                C1_NUM AS 'SOLIC. COMPRA',
+                C2_NUM AS 'OP'
+            FROM 
+                PROTHEUS12_R27.dbo.SC6010 itemPedidoVenda
+            LEFT JOIN
+                PROTHEUS12_R27.dbo.SD2010 itemNotaFiscalSaida
+            ON
+                itemPedidoVenda.C6_NUM = itemNotaFiscalSaida.D2_PEDIDO 
+                AND itemPedidoVenda.C6_PRODUTO = itemNotaFiscalSaida.D2_COD
+                AND	itemPedidoVenda.D_E_L_E_T_ = itemNotaFiscalSaida.D_E_L_E_T_
+            INNER JOIN
+                PROTHEUS12_R27.dbo.SC5010 cabecalhoPedidoVenda
+            ON
+                itemPedidoVenda.C6_NUM = cabecalhoPedidoVenda.C5_NUM
+            LEFT JOIN
+                SC1010 tabelaSolicCompras
+            ON
+                itemPedidoVenda.C6_NUM = tabelaSolicCompras.C1_ZZNUMQP
+                AND itemPedidoVenda.C6_PRODUTO = tabelaSolicCompras.C1_PRODUTO
+                AND	itemPedidoVenda.D_E_L_E_T_ = tabelaSolicCompras.D_E_L_E_T_
+            LEFT JOIN 
+                PROTHEUS12_R27.dbo.SC2010 tabelaOrdemDeProducao
+            ON
+                itemPedidoVenda.C6_NUM = tabelaOrdemDeProducao.C2_ZZNUMQP
+                AND itemPedidoVenda.C6_PRODUTO = tabelaOrdemDeProducao.C2_PRODUTO
+                AND itemPedidoVenda.D_E_L_E_T_ = tabelaOrdemDeProducao.D_E_L_E_T_ 
+            WHERE 
+                C6_XTPOPER LIKE '2%' -- C6_XTPOPER = 1 (QP) / 2 (QR) / 3 (ND - OUTROS)
+                AND D2_DOC IS NULL -- PV (ABERTO)
+                AND	itemPedidoVenda.D_E_L_E_T_ <> '*'
+            ORDER BY 
+                itemPedidoVenda.R_E_C_N_O_ ASC;
+        """)
+        return db.session.execute(query).fetchall()
+    except Exception as e:
+        error_message = f'Error to find open qrs: {e}'
+        logging.error(error_message)
+        send_email("API Error - find_open_qrs()", error_message)
+
+
 def send_email_notification(operation: str):
     try:
-        rows_all_qps = find_all_qp()
-        rows_all_indicators = find_all_indicators()
-        if rows_all_qps and rows_all_indicators:
-            dataframe = pd.DataFrame(rows_all_qps)
-            dataframe_all_indicators = pd.DataFrame(rows_all_indicators)
+        if operation in ["open_late", "open_up_to_date", "closed_no_date"]:
+            rows_all_qps = find_all_qp()
+            rows_all_indicators = find_all_indicators()
+            if rows_all_qps and rows_all_indicators:
+                dataframe = pd.DataFrame(rows_all_qps)
+                dataframe_all_indicators = pd.DataFrame(rows_all_indicators)
 
-            dataframe = dataframe.merge(dataframe_all_indicators[['cod_qp', 'status_proj', 'vl_proj_duration']],
-                                        on='cod_qp', how='left')
+                dataframe = dataframe.merge(dataframe_all_indicators[['cod_qp', 'status_proj', 'vl_proj_duration']],
+                                            on='cod_qp', how='left')
+            else:
+                raise Exception("Não foi encontrada nenhuma QP durante a consulta.")
 
-        else:
-            raise Exception("Não foi encontrada nenhuma QP durante a consulta.")
+            subject_title = "🦾🤖 Eureka® BOT - Notificação de Status de QP 🕗"
+            if operation == 'open_late':
+                dataframe = dataframe[(dataframe['status_qp'] == 'A') & (dataframe['vl_delay'] < 0)]
 
-        subject_title = "🦾🤖 Eureka® BOT INFORMA - NOTIFICAÇÃO PERIÓDICA DE QPS 🕗"
+                if not dataframe.empty:
+                    num_qps = len(dataframe)
+                    dataframe = formatar_dataframe_qps(dataframe, operation)
+                    status_message = f"""
+                        <p>🚨 Identifiquei <strong>{num_qps} QP(s)</strong> 
+                        <strong>em atraso quanto ao prazo de entrega.</strong></p>"""
+                    message = generate_email_body(dataframe, "QP(s) abertas em atraso ⏰📅", status_message)
 
-        if operation == 'open_late':
-            dataframe = dataframe[(dataframe['status_qp'] == 'A') & (dataframe['vl_delay'] < 0)]
+            elif operation == 'open_up_to_date':
+                dataframe = dataframe[
+                    (dataframe['status_qp'] == 'A') & (dataframe['vl_delay'] >= 0) & (dataframe['vl_delay'] <= 30)]
 
-            if not dataframe.empty:
-                dataframe = formatar_dataframe_qps(dataframe, operation)
-                status_message = "<strong>atrasadas em relação ao prazo de entrega! ⚠️</strong>"
-                message = generate_email_body(dataframe, "QP(s) abertas em atraso ⏰📅", status_message)
+                if not dataframe.empty:
+                    num_qps = len(dataframe)
+                    dataframe = formatar_dataframe_qps(dataframe, operation)
+                    status_message = f"""
+                        <p>⏰ Identifiquei <strong>{num_qps} QP(s)</strong>
+                        <strong>próximas do prazo de entrega.</strong></p>"""
+                    message = generate_email_body(dataframe, "QP(s) abertas em dia 📅✅", status_message)
 
-        elif operation == 'open_up_to_date':
-            dataframe = dataframe[(dataframe['status_qp'] == 'A') & (dataframe['vl_delay'] >= 0) & (dataframe['vl_delay'] <= 30)]
+            elif operation == 'closed_no_date':
+                dataframe = dataframe[(dataframe['status_qp'] == 'F') & (dataframe['vl_delay'] < 0) & (
+                            dataframe['status_delivery'] == 'SEM DATA DE ENTREGA')]
 
-            if not dataframe.empty:
-                dataframe = formatar_dataframe_qps(dataframe, operation)
-                status_message = "<strong>próximas do prazo de entrega! ⚠️</strong>"
-                message = generate_email_body(dataframe, "QP(s) abertas em dia 📅✅", status_message)
+                if not dataframe.empty:
+                    num_qps = len(dataframe)
+                    dataframe = formatar_dataframe_qps(dataframe, operation)
+                    status_message = f"""
+                        <p>✅ Identifiquei <strong>{num_qps} QP(s)</strong> finalizada(s) com produto entregue ao cliente.
+                        <br>⚠️ <strong>Data de entrega não preenchida</strong> no módulo <u><b>Gestão de QPs</b></u> do Eureka®.
+                        <br>📋 Recomenda-se o preenchimento para manter o histórico completo e possibilitar análises 
+                        precisas.</p>"""
+                    message = generate_email_body(dataframe, "QP(s) finalizadas sem data de entrega 📅❌", status_message)
 
-        elif operation == 'closed_no_date':
-            dataframe = dataframe[(dataframe['status_qp'] == 'F') & (dataframe['vl_delay'] < 0) & (dataframe['status_delivery'] == 'SEM DATA DE ENTREGA')]
+            if dataframe.empty:
+                raise Exception(f"Não há registros que atendam à condição para a operação {operation}.")
 
-            if not dataframe.empty:
-                dataframe = formatar_dataframe_qps(dataframe, operation)
-                status_message = ("<strong>FINALIZADAS ✅</strong>, os produtos foram <strong>ENTREGUES 🚚</strong>, "
-                                  "mas a <strong>DATA DE ENTREGA 📅</strong><br><strong>NÃO FOI "
-                                  "PREENCHIDA</strong> no <strong>EUREKA® QPS ⚠️<br></strong><br>🤖 Recomendo "
-                                  "preencher a data para "
-                                  "mantermos nosso histórico completo e gerarmos análises mais precisas, que nos "
-                                  "ajudarão a tomar decisões melhores no futuro.")
-                message = generate_email_body(dataframe, "QP(s) finalizadas sem data de entrega 📅❌", status_message)
+            send_email(subject_title, message, operation)
+            return True, "✔️ Serviço de notificação por e-mail executado com sucesso!"
+        elif operation in ['open']:
+            row_all_qr = find_open_qrs()
+            if row_all_qr:
+                dataframe = pd.DataFrame(row_all_qr)
+            else:
+                raise Exception("Não foi encontrada nenhuma QR durante a consulta.")
+            subject_title = "🦾🤖 Eureka® BOT - Notificação de Status de QR 🛒🕗"
+            if operation == 'open' and not dataframe.empty:
+                num_qps = len(dataframe)
+                dataframe = formatar_dataframe_qrs(dataframe)
+                status_message = f"""
+                    <p>🔔 Identifiquei <strong>{num_qps} QR(s)</strong>
+                    <strong>em aberto no sistema.</strong>
+                    <br>📋 Recomenda-se atenção aos prazos para garantir a entrega pontual aos clientes.</p>"""
+                message = generate_email_body(dataframe, "QR(s) ABERTAS ⏰📅", status_message)
 
-        if dataframe.empty:
-            raise Exception(f"Não há registros que atendam à condição para a operação {operation}.")
+            if dataframe.empty:
+                raise Exception(f"Não há registros que atendam à condição para a operação {operation}.")
 
-        send_email(subject_title, message, operation)
-        return True, "✔️ Serviço de notificação por e-mail executado com sucesso!"
+            send_email(subject_title, message, operation)
+            return True, "✔️ Serviço de notificação por e-mail executado com sucesso!"
     except Exception as ex:
         return False, str(ex)
 
 
-def formatar_dataframe_qps(dataframe: pd.DataFrame, operation: str) -> DataFrame:
-    dataframe = dataframe.drop(columns=['id', 'S_T_A_M_P'])
-    dataframe['cod_qp'] = dataframe['cod_qp'].astype(str).str.lstrip('0')
-    dataframe = dataframe.rename(columns={
-        'cod_qp': 'QP',
-        'des_qp': 'PROJETO',
-        'status_qp': 'STATUS',
-        'dt_open_qp': 'DATA DE EMISSÃO',
-        'dt_end_qp': 'PRAZO DE ENTREGA',
-        'vl_delay': 'SALDO (EM DIAS)',
-        'status_delivery': 'STATUS DE ENTREGA'
-    })
-    if operation != 'closed_no_date':
-        dataframe = dataframe.drop(columns=['dt_completed_qp'])
-        dataframe['STATUS'] = dataframe['STATUS'].replace('A', 'ABERTO')
-        dataframe['status_proj'] = dataframe['status_proj'].replace({'N': 'NÃO INICIADO', 'A': 'EM ANDAMENTO',
-                                                                     'F': 'FINALIZADO'})
-        dataframe = dataframe.rename(columns={
-            'status_proj': 'STATUS PROJETO',
-            'vl_proj_duration': 'DURAÇÃO PROJETO (EM DIAS)'
-        })
-        new_order_columns = ['QP', 'PROJETO', 'STATUS', 'DATA DE EMISSÃO', 'PRAZO DE ENTREGA', 'SALDO (EM DIAS)',
-                             'STATUS PROJETO', 'DURAÇÃO PROJETO (EM DIAS)', 'STATUS DE ENTREGA']
-        dataframe = dataframe.reindex(columns=new_order_columns)
-    elif operation == 'closed_no_date':
-        dataframe = dataframe.rename(columns={'dt_completed_qp': 'DATA DE ENTREGA'})
-        dataframe['STATUS'] = dataframe['STATUS'].replace('F', 'FINALIZADA')
-        dataframe = dataframe.drop(columns=['status_proj', 'vl_proj_duration'])
-
-    return dataframe
-
-
 def generate_email_body(df: pd.DataFrame, description: str, status_message: str) -> str:
-    num_qps = len(df)
-
     image_path = Path(__file__).resolve().parent.parent.parent / "assets" / "images" / "logo_enaplic.jpg"
     with open(image_path, "rb") as image_file:
         encoded_image = base64.b64encode(image_file.read()).decode('utf-8')
@@ -612,12 +661,13 @@ def generate_email_body(df: pd.DataFrame, description: str, status_message: str)
     </head>
     <body>
         <h2>{description}</h2>
-        <p>🤖 Olá, bom dia!</p>
-        <p>🤖 Localizei <strong>{num_qps} QP(s)</strong> que estão {status_message}</p>
+        <p>🤖 Bom dia!</p>
+        <p>🤖 Espero que esteja bem!</p>
+        {status_message}
         <br>
         {df_html}
         <br>
-        <p>🤖 Desejo à você um ótimo dia!</p>
+        <p>🤖 Tenha um excelente dia!</p>
         <p>Atenciosamente,</p>
         <p><strong>🦾🤖 Eureka® BOT</strong></p>
         <p>👨‍💻 <i>Este e-mail foi gerado automaticamente e não há necessidade de respondê-lo.</i></p>
@@ -664,20 +714,92 @@ def clean_string(input_string: str) -> str:
     return input_string[8:].replace('-', '').replace('_NOVA_VERSÃO', '').replace('.xlsm', '').strip().upper()
 
 
-def map_status_proj(status: str) -> str:
+def map_status_proj(status_proj: str) -> str:
     status_mapping = {
         'Finalizado': 'F',
         'Em andamento': 'A',
         'Não iniciado': 'N'
     }
-    return status_mapping[status]
+    return status_mapping[status_proj]
 
 
-def format_qp(qp: str) -> str:
-    return qp.split('-')[1].replace('E', '').strip().zfill(6)
+def format_qp(qp_number: str) -> str:
+    return qp_number.split('-')[1].replace('E', '').strip().zfill(6)
 
 
-def format_date(date: Any) -> str:
+def format_date_sharepoint(date: Any) -> str:
     if pd.isnull(date):
         return ''
     return pd.to_datetime(date).strftime('%d/%m/%Y')
+
+
+def format_date_db_sqlserver(date: str):
+    date_obj = datetime.strptime(date, "%Y%m%d")
+    return date_obj.strftime("%d/%m/%Y")
+
+
+def formatar_dataframe_qps(dataframe: pd.DataFrame, operation: str) -> DataFrame:
+    dataframe = dataframe.drop(columns=['id', 'S_T_A_M_P'])
+    dataframe['cod_qp'] = dataframe['cod_qp'].astype(str).str.lstrip('0')
+    dataframe = dataframe.rename(columns={
+        'cod_qp': 'QP',
+        'des_qp': 'PROJETO',
+        'status_qp': 'STATUS',
+        'dt_open_qp': 'DATA DE EMISSÃO',
+        'dt_end_qp': 'PRAZO DE ENTREGA',
+        'vl_delay': 'SALDO (EM DIAS)',
+        'status_delivery': 'STATUS DE ENTREGA'
+    })
+    if operation != 'closed_no_date':
+        dataframe = dataframe.drop(columns=['dt_completed_qp'])
+        dataframe['STATUS'] = dataframe['STATUS'].replace('A', 'ABERTO')
+        dataframe['status_proj'] = dataframe['status_proj'].replace({'N': 'NÃO INICIADO', 'A': 'EM ANDAMENTO',
+                                                                     'F': 'FINALIZADO'})
+        dataframe = dataframe.rename(columns={
+            'status_proj': 'STATUS PROJETO',
+            'vl_proj_duration': 'DURAÇÃO PROJETO (EM DIAS)'
+        })
+        new_order_columns = ['QP', 'PROJETO', 'STATUS', 'DATA DE EMISSÃO', 'PRAZO DE ENTREGA', 'SALDO (EM DIAS)',
+                             'STATUS PROJETO', 'DURAÇÃO PROJETO (EM DIAS)', 'STATUS DE ENTREGA']
+        dataframe = dataframe.reindex(columns=new_order_columns)
+    elif operation == 'closed_no_date':
+        dataframe = dataframe.rename(columns={'dt_completed_qp': 'DATA DE ENTREGA'})
+        dataframe['STATUS'] = dataframe['STATUS'].replace('F', 'FINALIZADA')
+        dataframe = dataframe.drop(columns=['status_proj', 'vl_proj_duration'])
+    return dataframe
+
+
+def format_number(value):
+    value = float(value)
+    if value.is_integer():
+        return int(value)
+    else:
+        return locale.format_string("%.2f", value, grouping=True)
+
+
+def formatar_dataframe_qrs(df: pd.DataFrame):
+    df = df.fillna('')
+
+    columns_remove_left_zeros = ['QR', 'SOLIC. COMPRA', 'OP']
+    df[columns_remove_left_zeros] = df[columns_remove_left_zeros].apply(lambda x: x.str.lstrip('0'))
+
+    columns_format_date = ['PV ABERTO EM:', 'DATA DE ENTREGA']
+    df[columns_format_date] = df[columns_format_date].apply(lambda x: x.apply(format_date_db_sqlserver))
+
+    df['DATA DE ENTREGA'] = (
+        pd.to_datetime(df['DATA DE ENTREGA'], dayfirst=True, format='%d/%m/%Y').dt.strftime('%d/%m/%Y'))
+    today = datetime.now()
+
+    df.insert(8, 'SALDO (EM DIAS)', '')
+    df['SALDO (EM DIAS)'] = (pd.to_datetime(df['DATA DE ENTREGA'], dayfirst=True, format='%d/%m/%Y') - today).dt.days
+
+    df.loc[df['DATA DE ENTREGA'].isna(), 'SALDO (EM DIAS)'] = pd.NA
+
+    number_columns = ['QTD. VENDA', 'SALDO (EM DIAS)']
+    df[number_columns] = df[number_columns].apply(lambda x: x.apply(format_number))
+
+    df['STATUS'] = df['SALDO (EM DIAS)'].apply(
+        lambda saldo: 'EM ATRASO' if saldo < 0 else 'EM DIA' if pd.notna(saldo) else pd.NA
+    )
+
+    return df
