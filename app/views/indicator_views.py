@@ -222,7 +222,7 @@ if __name__ == '__main__':
     scheduler.add_job(scheduled_task_send_email_qp_open_up_to_date, CronTrigger(day_of_week='tue', hour=9, minute=30, timezone=america_sp_timezone))
     scheduler.add_job(scheduled_task_send_email_qp_closed_no_date, CronTrigger(day_of_week='wed', hour=9, minute=30, timezone=america_sp_timezone))
     scheduler.add_job(scheduled_task_send_email_open_qr, CronTrigger(day_of_week='mon', hour=9, minute=0, timezone=america_sp_timezone))
-    scheduler.add_job(scheduled_task_send_email_open_qr, CronTrigger(day_of_week='wed', hour=15, minute=20, timezone=america_sp_timezone))
+    scheduler.add_job(scheduled_task_send_email_open_qr, CronTrigger(day_of_week='wed', hour=9, minute=0, timezone=america_sp_timezone))
     logging.info(f"Job agendado para executar no fuso horário {america_sp_timezone}")
     scheduler.start()
     logging.info("Scheduler iniciado!")
