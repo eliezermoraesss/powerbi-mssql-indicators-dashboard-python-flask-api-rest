@@ -280,7 +280,7 @@ def update_all_qps_table(data_proj_indicator: Dict[str, Any], status_qp: str) ->
                 intervalo_de_dias = 0
                 status_entrega = 'SEM REFERÊNCIA DE ENTREGA'
             else:
-                intervalo_de_dias = (pd.to_datetime(prazo_de_entrega, dayfirst=True) - datetime.now() + 1).days
+                intervalo_de_dias = (pd.to_datetime(prazo_de_entrega, dayfirst=True) - datetime.now()).days + 1
                 if intervalo_de_dias >= 0:
                     status_entrega = 'EM DIA'
                 else:
@@ -340,14 +340,14 @@ def update_all_qps_table(data_proj_indicator: Dict[str, Any], status_qp: str) ->
                     data_de_entrega = get_all_data_conclusao(cod_qp)
                     if data_de_entrega is not None:
                         intervalo_de_dias_com_data_entrega = (
-                                pd.to_datetime(prazo_de_entrega, dayfirst=True) - pd.to_datetime(data_de_entrega,
-                                                                                                 dayfirst=True)).days
+                                pd.to_datetime(prazo_de_entrega, dayfirst=True) -
+                                pd.to_datetime(data_de_entrega, dayfirst=True)).days + 1
                         if not pd.isnull(intervalo_de_dias_com_data_entrega):
                             if intervalo_de_dias_com_data_entrega >= 0:
                                 update_params['status_entrega'] = 'ENTREGUE NO PRAZO'
                             else:
                                 update_params['status_entrega'] = 'ENTREGUE EM ATRASO'
-                            intervalo_de_dias = intervalo_de_dias_com_data_entrega + 1
+                            intervalo_de_dias = intervalo_de_dias_com_data_entrega
                     else:
                         data_de_entrega = ''
 
@@ -791,7 +791,8 @@ def formatar_dataframe_qrs(df: pd.DataFrame):
     today = datetime.now()
 
     df.insert(8, 'SALDO (EM DIAS)', '')
-    df['SALDO (EM DIAS)'] = (pd.to_datetime(df['DATA DE ENTREGA'], dayfirst=True, format='%d/%m/%Y') - today + 1).dt.days
+    df['SALDO (EM DIAS)'] = ((pd.to_datetime(df['DATA DE ENTREGA'], dayfirst=True, format='%d/%m/%Y') - today)
+                             .dt.days + 1)
 
     df.loc[df['DATA DE ENTREGA'].isna(), 'SALDO (EM DIAS)'] = pd.NA
 
