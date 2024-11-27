@@ -508,12 +508,12 @@ def find_open_qrs():
                 C5_ZZNOME AS 'CLIENTE',
                 C6_PRODUTO AS 'CÓDIGO',
                 C6_DESCRI AS 'DESCRIÇÃO',
-                C6_UM AS 'UNID.', 
+                C6_UM AS 'UN.', 
                 C6_QTDVEN AS 'QTD. VENDA',
-                C5_EMISSAO 'PV ABERTO EM:',
-                C6_ENTREG AS 'DATA DE ENTREGA',
                 C1_NUM AS 'SOLIC. COMPRA',
-                C2_NUM AS 'OP'
+                C2_NUM AS 'OP',
+                C5_EMISSAO 'PV ABERTO EM:',
+                C6_ENTREG AS 'DATA DE ENTREGA'
             FROM 
                 PROTHEUS12_R27.dbo.SC6010 itemPedidoVenda
             LEFT JOIN
@@ -540,6 +540,7 @@ def find_open_qrs():
                 AND itemPedidoVenda.D_E_L_E_T_ = tabelaOrdemDeProducao.D_E_L_E_T_ 
             WHERE 
                 C6_XTPOPER LIKE '2%' -- C6_XTPOPER = 1 (QP) / 2 (QR) / 3 (ND - OUTROS)
+                AND cabecalhoPedidoVenda.C5_NOTA <> 'XXXXXXXXX'
                 AND D2_DOC IS NULL -- PV (ABERTO)
                 AND	itemPedidoVenda.D_E_L_E_T_ <> '*'
             ORDER BY 
