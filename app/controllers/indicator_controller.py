@@ -618,10 +618,10 @@ def send_email_notification(operation: str):
                 raise Exception("Não foi encontrada nenhuma QR durante a consulta.")
             subject_title = "🦾🤖 Eureka® BOT - Notificação de Status de QR 🛒🕗"
             if operation == 'open' and not dataframe.empty:
-                num_qps = len(dataframe)
+                num_qrs = dataframe['QR'].nunique()
                 dataframe = formatar_dataframe_qrs(dataframe)
                 status_message = f"""
-                    <p>🔔 Identifiquei <strong>{num_qps} QR(s)</strong>
+                    <p>🔔 Identifiquei <strong>{num_qrs} QR(s)</strong>
                     <strong>em aberto no sistema.</strong>
                     <br>📋 Recomenda-se atenção aos prazos para garantir a entrega pontual aos clientes.</p>"""
                 message = generate_email_body(dataframe, "QR(s) ABERTAS ⏰📅", status_message)
