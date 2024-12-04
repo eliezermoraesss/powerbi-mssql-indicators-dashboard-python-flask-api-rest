@@ -23,8 +23,9 @@ def send_email(subject, body, operation=None):
         send_only_this_areas = ['DESENVOLVIMENTO', 'GESTAO', 'PCP', 'DIRETORIA']
         recipients = email_extract(send_only_this_areas, email_params)
     elif operation == 'open':
-        send_only_this_ares = ['DESENVOLVIMENTO', 'GESTAO', 'ALMOXARIFADO', 'PCP', 'COMPRAS', 'FISCAL', 'DIRETORIA']
-        recipients = email_extract(send_only_this_ares, email_params)
+        send_only_this_areas = ['DESENVOLVIMENTO', 'GESTAO', 'ALMOXARIFADO', 'PCP', 'COMPRAS', 'FISCAL', 'DIRETORIA',
+                                'COMERCIAL']
+        recipients = email_extract(send_only_this_areas, email_params)
 
     recipients = list(set(recipients))
     recipients.sort()
