@@ -3,6 +3,7 @@ import locale
 from datetime import datetime
 from pathlib import Path
 
+from dateutil.relativedelta import relativedelta
 from pandas import DataFrame
 
 from app import db
@@ -340,8 +341,9 @@ def update_all_qps_table(data_proj_indicator: Dict[str, Any], status_qp: str) ->
                     data_de_entrega = get_all_data_conclusao(cod_qp)
                     if data_de_entrega is not None:
                         intervalo_de_dias_com_data_entrega = (
-                                pd.to_datetime(prazo_de_entrega, dayfirst=True) -
-                                pd.to_datetime(data_de_entrega, dayfirst=True)).days + 1
+                                                                     pd.to_datetime(prazo_de_entrega, dayfirst=True) -
+                                                                     pd.to_datetime(data_de_entrega,
+                                                                                    dayfirst=True)).days + 1
                         if not pd.isnull(intervalo_de_dias_com_data_entrega):
                             if intervalo_de_dias_com_data_entrega >= 0:
                                 update_params['status_entrega'] = 'ENTREGUE NO PRAZO'
@@ -407,14 +409,17 @@ def get_project_data(excel_file_name) -> Dict[str, Any]:
 
                 data_inicio_proj = format_date_sharepoint(
                     df[df['ITEM'] == 'BASELINE']['DATA_INICIO_PROJ'].values[0])  # REMOVER
-                data_fim_proj = format_date_sharepoint(df[df['ITEM'] == 'BASELINE']['DATA_FIM_PROJ'].values[0])  # REMOVER
+                data_fim_proj = format_date_sharepoint(
+                    df[df['ITEM'] == 'BASELINE']['DATA_FIM_PROJ'].values[0])  # REMOVER
                 data_inicio_proj = '' if data_inicio_proj == '00/01/1900' else data_inicio_proj  # REMOVER
                 data_fim_proj = '' if data_fim_proj == '00/01/1900' else data_fim_proj  # REMOVER
 
                 status_proj = map_status_proj(df[df['ITEM'] == 'BASELINE']['STATUS_PROJETO'].values[0])
 
-                data_emissao_qp = format_date_sharepoint(df[df['ITEM'] == 'BASELINE']['DATA_EMISSAO'].values[0])  # REMOVER
-                prazo_entrega_qp = format_date_sharepoint(df[df['ITEM'] == 'BASELINE']['PRAZO_ENTREGA'].values[0])  # REMOVER
+                data_emissao_qp = format_date_sharepoint(
+                    df[df['ITEM'] == 'BASELINE']['DATA_EMISSAO'].values[0])  # REMOVER
+                prazo_entrega_qp = format_date_sharepoint(
+                    df[df['ITEM'] == 'BASELINE']['PRAZO_ENTREGA'].values[0])  # REMOVER
                 data_proj_indicator[qp] = {
                     "qp": qp,
                     "description": description,
@@ -548,89 +553,156 @@ def find_open_qrs():
         """)
         return db.session.execute(query).fetchall()
     except Exception as e:
-        error_message = f'Error to find open qrs: {e}'
+        error_message = f'Error to find open QRs: {e}'
         logging.error(error_message)
         send_email("API Error - find_open_qrs()", error_message)
 
 
-def send_email_notification(operation: str):
+def find_open_sc():
+    data_atual = datetime.now()
+    data_modificada = data_atual - relativedelta(months=4)
+    data_limite_inferior = data_modificada.strftime("%Y%m%d")
     try:
-        if operation in ["open_late", "open_up_to_date", "closed_no_date"]:
-            rows_all_qps = find_all_qp()
-            rows_all_indicators = find_all_indicators()
-            if rows_all_qps and rows_all_indicators:
-                dataframe = pd.DataFrame(rows_all_qps)
-                dataframe_all_indicators = pd.DataFrame(rows_all_indicators)
+        query = text(f"""
+            SELECT
+                C1_ZZNUMQP AS [QP/QR],
+                C1_NUM AS 'SOLIC. COMPRA',
+                C1_PRODUTO AS 'CÓDIGO',
+                C1_DESCRI AS 'DESCRIÇÃO',
+                C1_UM AS 'UN.',
+                C1_QUANT AS 'QUANTIDADE',
+                C1_ITEM AS 'ITEM',
+                C1_EMISSAO AS 'EMISSÃO',
+                C1_OBS AS 'OBSERVAÇÃO',
+                US.USR_NOME AS 'SOLICITANTE'
+            FROM 
+                PROTHEUS12_R27.dbo.SC1010 SC
+            LEFT JOIN
+                PROTHEUS12_R27.dbo.SYS_USR US
+            ON
+                C1_SOLICIT = US.USR_CODIGO 
+                AND US.D_E_L_E_T_ <> '*'
+            WHERE
+                SC.D_E_L_E_T_ <> '*'
+                AND C1_PEDIDO = '      '
+                AND C1_EMISSAO >= '{data_limite_inferior}'
+            ORDER BY 
+                C1_NUM ASC;
+        """)
+        return db.session.execute(query).fetchall()
+    except Exception as e:
+        error_message = f'Error to find open SC: {e}'
+        logging.error(error_message)
+        send_email("API Error - find_open_sc()", error_message)
 
-                dataframe = dataframe.merge(dataframe_all_indicators[['cod_qp', 'status_proj', 'vl_proj_duration']],
-                                            on='cod_qp', how='left')
+
+def send_email_notification_sc(status_url: str):
+    try:
+        if status_url == 'open':
+            row_all_qr = find_open_sc()
+            if row_all_qr:
+                dataframe = pd.DataFrame(row_all_qr)
             else:
-                raise Exception("Não foi encontrada nenhuma QP durante a consulta.")
-
-            subject_title = "🦾🤖 Eureka® BOT - Notificação de Status de QP 🕗"
-            if operation == 'open_late':
-                dataframe = dataframe[(dataframe['status_qp'] == 'A') & (dataframe['vl_delay'] < 0)]
-
-                if not dataframe.empty:
-                    num_qps = len(dataframe)
-                    dataframe = formatar_dataframe_qps(dataframe, operation)
-                    status_message = f"""
-                        <p>🚨 Identifiquei <strong>{num_qps} QP(s)</strong> 
-                        <strong>em atraso quanto ao prazo de entrega.</strong></p>"""
-                    message = generate_email_body(dataframe, "QP(s) abertas em atraso ⏰📅", status_message)
-
-            elif operation == 'open_up_to_date':
-                dataframe = dataframe[
-                    (dataframe['status_qp'] == 'A') & (dataframe['vl_delay'] >= 0) & (dataframe['vl_delay'] <= 30)]
-
-                if not dataframe.empty:
-                    num_qps = len(dataframe)
-                    dataframe = formatar_dataframe_qps(dataframe, operation)
-                    status_message = f"""
-                        <p>⏰ Identifiquei <strong>{num_qps} QP(s)</strong>
-                        <strong>próximas do prazo de entrega.</strong></p>"""
-                    message = generate_email_body(dataframe, "QP(s) abertas em dia 📅✅", status_message)
-
-            elif operation == 'closed_no_date':
-                dataframe = dataframe[(dataframe['status_qp'] == 'F') & (dataframe['vl_delay'] < 0) & (
-                            dataframe['status_delivery'] == 'SEM DATA DE ENTREGA')]
-
-                if not dataframe.empty:
-                    num_qps = len(dataframe)
-                    dataframe = formatar_dataframe_qps(dataframe, operation)
-                    status_message = f"""
-                        <p>✅ Identifiquei <strong>{num_qps} QP(s)</strong> finalizada(s) com produto entregue ao cliente.
-                        <br>⚠️ <strong>Data de entrega não preenchida</strong> no módulo <u><b>Gestão de QPs</b></u> do Eureka®.
-                        <br>📋 Recomenda-se o preenchimento para manter o histórico completo e possibilitar análises 
-                        precisas.</p>"""
-                    message = generate_email_body(dataframe, "QP(s) finalizadas sem data de entrega 📅❌", status_message)
+                raise Exception("Não foi encontrada nenhuma Solic. de Compras durante a consulta.")
+            subject_title = "🦾🤖 Eureka® BOT - Notificação de Solicitação de Compras em Aberto 🛒🟢"
+            if status_url == 'open' and not dataframe.empty:
+                num_qrs = dataframe['SOLIC. COMPRA'].nunique()
+                dataframe = formatar_dataframe_solic_compra(dataframe)
+                status_message = f"""
+                    <p>🔔 Identifiquei <strong>{num_qrs}</strong> solicitações de compra <u>em aberto</u> no sistema.<p>
+                    <p>📅 O período de consulta foi de <u><b>4 meses</b></u>.</p>
+                    <p>📋 Recomendo atenção aos prazos para garantir a entrega pontual dos produtos aos clientes.</p>"""
+                message = generate_email_body(dataframe, "Solicitação de Compras em aberto 🛒🟢", status_message)
 
             if dataframe.empty:
-                raise Exception(f"Não há registros que atendam à condição para a operação {operation}.")
+                raise Exception(f"Não há registros que atendam à condição para a operação {status_url}.")
 
-            send_email(subject_title, message, operation)
+            send_email(subject_title, message, dataframe=dataframe, operation='sc', status=status_url)
             return True, "✔️ Serviço de notificação por e-mail executado com sucesso!"
-        elif operation in ['open']:
+    except Exception as ex:
+        return False, str(ex)
+
+
+def send_email_notification_qr(status_url: str):
+    try:
+        if status_url == 'open':
             row_all_qr = find_open_qrs()
             if row_all_qr:
                 dataframe = pd.DataFrame(row_all_qr)
             else:
                 raise Exception("Não foi encontrada nenhuma QR durante a consulta.")
             subject_title = "🦾🤖 Eureka® BOT - Notificação de Status de QR 🛒🕗"
-            if operation == 'open' and not dataframe.empty:
+            if status_url == 'open' and not dataframe.empty:
                 num_qrs = dataframe['QR'].nunique()
                 dataframe = formatar_dataframe_qrs(dataframe)
                 status_message = f"""
-                    <p>🔔 Identifiquei <strong>{num_qrs} QR(s)</strong>
-                    <strong>em aberto no sistema.</strong>
+                    <p>🔔 Identifiquei <strong>{num_qrs}</strong> QR(s) <u>em aberto</u> no sistema.<br>
                     <br>📋 Recomenda-se atenção aos prazos para garantir a entrega pontual aos clientes.</p>"""
-                message = generate_email_body(dataframe, "QR(s) ABERTAS ⏰📅", status_message)
+                message = generate_email_body(dataframe, "QR(s) em aberto 🟢⏰📅", status_message)
 
             if dataframe.empty:
-                raise Exception(f"Não há registros que atendam à condição para a operação {operation}.")
+                raise Exception(f"Não há registros que atendam à condição para a operação {status_url}.")
 
-            send_email(subject_title, message, operation)
+            send_email(subject_title, message, dataframe=dataframe, operation='qr', status=status_url)
             return True, "✔️ Serviço de notificação por e-mail executado com sucesso!"
+    except Exception as ex:
+        return False, str(ex)
+
+
+def send_email_notification_qp(status_url: str):
+    try:
+        rows_all_qps = find_all_qp()
+        rows_all_indicators = find_all_indicators()
+        if rows_all_qps and rows_all_indicators:
+            dataframe = pd.DataFrame(rows_all_qps)
+            dataframe_all_indicators = pd.DataFrame(rows_all_indicators)
+            dataframe = dataframe.merge(dataframe_all_indicators[['cod_qp', 'status_proj', 'vl_proj_duration']],
+                                        on='cod_qp', how='left')
+        else:
+            raise Exception("Não foi encontrada nenhuma QP durante a consulta.")
+
+        subject_title = "🦾🤖 Eureka® BOT - Notificação de Status de QP 🕗"
+        if status_url == 'open_late':
+            dataframe = dataframe[(dataframe['status_qp'] == 'A') & (dataframe['vl_delay'] < 0)]
+
+            if not dataframe.empty:
+                num_qps = len(dataframe)
+                dataframe = formatar_dataframe_qps(dataframe, status_url)
+                status_message = f"""
+                    <p>🚨 Identifiquei <strong>{num_qps}</strong> QP(s) <u>em atraso quanto ao prazo de entrega</u>.
+                    </p>"""
+                message = generate_email_body(dataframe, "QP(s) abertas em atraso 🟢⏰📅", status_message)
+
+        elif status_url == 'open_up_to_date':
+            dataframe = dataframe[
+                (dataframe['status_qp'] == 'A') & (dataframe['vl_delay'] >= 0) & (dataframe['vl_delay'] <= 30)]
+
+            if not dataframe.empty:
+                num_qps = len(dataframe)
+                dataframe = formatar_dataframe_qps(dataframe, status_url)
+                status_message = f"""
+                    <p>⏰ Identifiquei <strong>{num_qps}</strong> QP(s) <u>próximas do prazo de entrega</u>.</p>"""
+                message = generate_email_body(dataframe, "QP(s) abertas em dia 🟢📅", status_message)
+
+        elif status_url == 'closed_no_date':
+            dataframe = dataframe[(dataframe['status_qp'] == 'F') & (dataframe['vl_delay'] < 0) & (
+                    dataframe['status_delivery'] == 'SEM DATA DE ENTREGA')]
+
+            if not dataframe.empty:
+                num_qps = len(dataframe)
+                dataframe = formatar_dataframe_qps(dataframe, status_url)
+                status_message = f"""
+                    <p>✅ Identifiquei <strong>{num_qps}</strong> QP(s) <u>finalizada(s) com produto entregue ao cliente</u>.
+                    <br>⚠️ <strong>Data de entrega não preenchida</strong> no módulo <u><b>Gestão de QPs</b></u> do Eureka®.
+                    <br>📋 Recomenda-se o preenchimento para manter o histórico completo e possibilitar análises 
+                    precisas.</p>"""
+                message = generate_email_body(dataframe, "QP(s) finalizadas sem data de entrega 🔴📅", status_message)
+
+        if dataframe.empty:
+            raise Exception(f"Não há registros que atendam à condição para a operação {status_url}.")
+
+        send_email(subject_title, message, dataframe=dataframe, operation='qp', status=status_url)
+        return True, "✔️ Serviço de notificação por e-mail executado com sucesso!"
     except Exception as ex:
         return False, str(ex)
 
@@ -789,8 +861,8 @@ def formatar_dataframe_qrs(df: pd.DataFrame):
 
     df['DATA DE ENTREGA'] = (
         pd.to_datetime(df['DATA DE ENTREGA'], dayfirst=True, format='%d/%m/%Y').dt.strftime('%d/%m/%Y'))
-    today = datetime.now()
 
+    today = datetime.now()
     df.insert(8, 'SALDO (EM DIAS)', '')
     df['SALDO (EM DIAS)'] = ((pd.to_datetime(df['DATA DE ENTREGA'], dayfirst=True, format='%d/%m/%Y') - today)
                              .dt.days + 1)
@@ -803,5 +875,27 @@ def formatar_dataframe_qrs(df: pd.DataFrame):
     df['STATUS'] = df['SALDO (EM DIAS)'].apply(
         lambda saldo: 'EM ATRASO' if saldo < 0 else 'EM DIA' if pd.notna(saldo) else pd.NA
     )
+
+    return df
+
+
+def formatar_dataframe_solic_compra(df: pd.DataFrame):
+    df = df.fillna('')
+
+    df.insert(0, 'id', range(1, len(df) + 1))
+
+    columns_remove_left_zeros = ['QP/QR', 'SOLIC. COMPRA']
+    df[columns_remove_left_zeros] = df[columns_remove_left_zeros].apply(lambda x: x.str.lstrip('0'))
+
+    columns_format_date = ['EMISSÃO']
+    df[columns_format_date] = df[columns_format_date].apply(lambda x: x.apply(format_date_db_sqlserver))
+
+    today = datetime.now()
+    df.insert(len(df.columns), 'DIAS SC ABERTA SEM PEDIDO', '')
+    df['DIAS SC ABERTA SEM PEDIDO'] = ((today - pd.to_datetime(df['EMISSÃO'], dayfirst=True, format='%d/%m/%Y'))
+                                       .dt.days)
+
+    number_columns = ['QUANTIDADE', 'DIAS SC ABERTA SEM PEDIDO']
+    df[number_columns] = df[number_columns].apply(lambda x: x.apply(format_number))
 
     return df

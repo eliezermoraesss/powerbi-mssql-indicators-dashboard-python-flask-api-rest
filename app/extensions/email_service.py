@@ -1,30 +1,44 @@
+import io
 import smtplib
+from datetime import datetime
+from email.mime.application import MIMEApplication
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import logging
+import pandas as pd
 from app.extensions.setup_email_env import read_email_params
 
 logging.basicConfig(level=logging.DEBUG)
 
 
-def send_email(subject, body, operation=None):
-    email_params = read_email_params(operation)
+def send_email(subject, body, operation=None, status=None, dataframe=None):
+    email_params = read_email_params(status)
     sender_email = email_params['sender_email']
     password = email_params['password']  # Use the app password generated for Gmail e-mail provider
+    attached_name = ''
+    attached_instant_date = f'_{datetime.now().today().strftime('%d-%m-%Y_%H%M%S')}'
 
     recipients = []
-    if operation is None:
+    if status is None:
         recipients = email_params['recipients']
-    elif operation == 'open_late' or operation == 'open_up_to_date':
+    elif operation == 'qp' and status == 'open_late' or status == 'open_up_to_date':
+        attached_name = 'QP_ABERTA_EM_DIA' if status == 'open_up_to_date' else 'QP_ABERTA_EM_ATRASO'
         for email_list in email_params['recipients'].values():
             for email in email_list:
                 recipients.append(email)
-    elif operation == 'closed_no_date':
+    elif operation == 'qp' and status == 'closed_no_date':
+        attached_name = 'QP_FECHADA_SEM_DATA'
         send_only_this_areas = ['DESENVOLVIMENTO', 'GESTAO', 'PCP', 'DIRETORIA']
         recipients = email_extract(send_only_this_areas, email_params)
-    elif operation == 'open':
-        send_only_this_areas = ['DESENVOLVIMENTO', 'GESTAO', 'ALMOXARIFADO', 'PCP', 'COMPRAS', 'FISCAL', 'DIRETORIA',
+    elif operation == 'qr' and status == 'open':
+        attached_name = 'QR_ABERTA'
+        send_only_this_areas = ['DIRETORIA', 'DESENVOLVIMENTO', 'GESTAO', 'ALMOXARIFADO', 'PCP', 'COMPRAS', 'FISCAL',
                                 'COMERCIAL']
+        recipients = email_extract(send_only_this_areas, email_params)
+    elif operation == 'sc' and status == 'open':
+        attached_name = 'SC_ABERTA'
+        send_only_this_areas = ['DIRETORIA', 'DESENVOLVIMENTO', 'GESTAO', 'ALMOXARIFADO', 'PCP', 'COMPRAS', 'FISCAL',
+                                'COMERCIAL', 'ELETRICA']
         recipients = email_extract(send_only_this_areas, email_params)
 
     recipients = list(set(recipients))
@@ -36,10 +50,22 @@ def send_email(subject, body, operation=None):
     msg["To"] = ", ".join(recipients)
     msg["Subject"] = subject
 
-    if operation is not None:
+    if status is not None:
         msg.attach(MIMEText(body, "html"))
     else:
         msg.attach(MIMEText(body, "plain"))
+
+    if dataframe is not None:
+        buffer = io.BytesIO()
+
+        with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+            dataframe.to_excel(writer, index=False, sheet_name='Data')
+
+        buffer.seek(0)
+
+        part = MIMEApplication(buffer.getvalue(), Name=f'{attached_name}{attached_instant_date}.xlsx')
+        part['Content-Disposition'] = f'attachment; filename="{attached_name}{attached_instant_date}.xlsx"'
+        msg.attach(part)
 
     # Connect to the Gmail SMTP server and send the email
     try:
