@@ -263,7 +263,9 @@ if __name__ == '__main__':
     scheduler.add_job(scheduled_task_send_email_qp_closed_no_date,
                       CronTrigger(day_of_week='wed', hour=9, minute=30, timezone=america_sp_timezone))
     scheduler.add_job(scheduled_task_send_email_open_sc,
-                      CronTrigger(day_of_week='0-4', hour=10, minute=0, timezone=america_sp_timezone))
+                      CronTrigger(day_of_week='mon', hour=10, minute=0, timezone=america_sp_timezone))
+    scheduler.add_job(scheduled_task_send_email_open_sc,
+                      CronTrigger(day_of_week='wed', hour=10, minute=0, timezone=america_sp_timezone))
     scheduler.add_job(scheduled_task_save_all_indicators,
                       CronTrigger(day_of_week='0-4', hour=15, minute=0, timezone=america_sp_timezone))
 
